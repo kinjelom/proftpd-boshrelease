@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+JOB_DIR=/var/vcap/jobs/proftpd
+RUN_DIR=/var/vcap/sys/run/proftpd
+LOG_DIR=/var/vcap/sys/log/proftpd
+DATA_DIR=/var/vcap/data/proftpd
+
+DEFAULT_ROOT='<%= p("proftpd.default_root") %>'
+
+mkdir -p "$DEFAULT_ROOT" "$DATA_DIR/config" "$DATA_DIR/mod_prometheus" "$RUN_DIR" "$LOG_DIR"
+chown -R vcap:vcap "$DEFAULT_ROOT" "$DATA_DIR" "$RUN_DIR" "$LOG_DIR"
+chmod 0750 "$DEFAULT_ROOT" "$DATA_DIR" "$DATA_DIR/config" "$DATA_DIR/mod_prometheus" "$RUN_DIR" "$LOG_DIR"
+
+# mkdir -p "$DATA_DIR/mod_prometheus/empty"
+# chmod 0111 "$DATA_DIR/mod_prometheus/empty"
+
+exec >>"$LOG_DIR/pre-start.stdout.log" 2>>"$LOG_DIR/pre-start.stderr.log"
+
+# Optional local auth preparation (script must exist and be executable)
+<%- if_p("proftpd.local_auth.enabled") do |enabled| if enabled-%>
+if [[ -x "$JOB_DIR/bin/prepare-local-auth.sh" ]]; then
+  "$JOB_DIR/bin/prepare-local-auth.sh"
+else
+  echo "[pre-start] WARN: $JOB_DIR/bin/prepare-local-auth.sh not found or not executable"
+fi
+<%- end end -%>
+
+# Validate config after filesystem/layout is ready
+ALL_PKG_DIR="/var/vcap/packages"
+CONF_FILE="$JOB_DIR/config/proftpd.conf"
+export LD_LIBRARY_PATH="${ALL_PKG_DIR}/proftpd/lib:${ALL_PKG_DIR}/lib/mariadb:${ALL_PKG_DIR}/sqlite/lib:${ALL_PKG_DIR}/libmicrohttpd/lib:${ALL_PKG_DIR}/zlib/lib:${LD_LIBRARY_PATH:-}"
+if ! "$ALL_PKG_DIR/proftpd/sbin/proftpd" -t -c "$CONF_FILE"; then
+  echo "[pre-start] ERROR: proftpd.conf is invalid, aborting."
+  exit 1
+else
+  echo "[pre-start] SUCCESS: proftpd.conf is valid"
+fi
+
+echo "[pre-start] ProFTPD config OK."

@@ -1,0 +1,65 @@
+name: ((deployment_name))
+
+instance_groups:
+- name: proftpd
+  azs: ((proftpd_azs))
+  instances: ((proftpd_instances))
+  vm_type: ((proftpd_vm_type))
+  stemcell: default
+  persistent_disk_type: ((proftpd_persistent_disk_type))
+  networks: [{name: default}]
+  jobs:
+  - name: proftpd
+    release: proftpd
+    tags:
+      prometheus_exporter_port: ((prometheus_exporter_port)) # 9273
+    properties:
+      proftpd:
+        server_name: ((deployment_name))
+        port: ((proftpd_port))
+        mod_prometheus:
+          enabled: true
+          exporter_port: ((prometheus_exporter_port))
+        local_auth:
+          enabled: true
+          users:
+          - name: test-user
+            password: change-it
+            # home: default /var/vcap/store/proftpd/data/homes/test-user
+          - name: test-user-ro
+            password: change-it
+            home: /var/vcap/store/proftpd/data/homes/test-user
+        raw_config:
+          closing:
+          - "<Limit LOGIN>"
+          - "  AllowUser test-user test-user-ro"
+          - "</Limit>"
+          - "<Directory /var/vcap/store/proftpd/data/homes/test-user>"
+          - "  # Full access user"
+          - "  <Limit ALL>"
+          - "    AllowUser test-user"
+          - "    DenyAll"
+          - "  </Limit>"
+          - "  # Read-only user"
+          - "  <Limit READ DIRS>"
+          - "    AllowUser test-user-ro"
+          - "  </Limit>"
+          - "  <Limit WRITE>"
+          - "    DenyUser test-user-ro"
+          - "  </Limit>"
+          - "</Directory>"
+stemcells:
+- alias: default
+  os: ubuntu-jammy
+  version: latest
+
+releases:
+- name: proftpd
+  version: latest
+
+update:
+  canaries: 0
+  max_in_flight: 1
+  serial: true
+  canary_watch_time: 1000-20000
+  update_watch_time: 1000-20000

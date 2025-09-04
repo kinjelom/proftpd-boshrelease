@@ -1,0 +1,6 @@
+---
+name: zlib
+dependencies: []
+files:
+- meta-info/blobs-versions.env
+- devs/zlib-*.tar.gz

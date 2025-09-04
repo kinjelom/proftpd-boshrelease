@@ -1,0 +1,6 @@
+---
+name: sqlite
+dependencies: []
+files:
+- meta-info/blobs-versions.env
+- devs/sqlite-autoconf-*.tar.gz

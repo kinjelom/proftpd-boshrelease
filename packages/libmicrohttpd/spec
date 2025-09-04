@@ -1,0 +1,6 @@
+---
+name: libmicrohttpd
+dependencies: []
+files:
+- meta-info/blobs-versions.env
+- devs/libmicrohttpd-*.tar.gz

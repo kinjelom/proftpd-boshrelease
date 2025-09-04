@@ -1,0 +1,163 @@
+<%
+  def p_truthy(path)
+    val = begin p(path) rescue false end
+    val === true || val.to_s.downcase == "true"
+  end
+
+  def arr(v)
+    v.is_a?(Array) ? v : Array(v).compact
+  end
+-%>
+<%# @formatter:off -%>
+# --- Raw config prologue ---
+<% p('proftpd.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+# --- Config ---
+DefaultServer      on
+ServerName         <%= p('proftpd.server_name') %>
+ServerType         standalone
+Port               <%= p('proftpd.port') %>
+DefaultAddress     <%= p_truthy("proftpd.listen_on_instance_ip") ? spec.ip : "0.0.0.0" %>
+<%- if_p("proftpd.passive_ports") do |passive_ports| -%>
+PassivePorts  <%= passive_ports %>
+<%- end -%>
+<%- if_p("proftpd.masquerade_address") do |masquerade_address| -%>
+MasqueradeAddress  <%= masquerade_address %>
+<%- end -%>
+UseIPv6            off
+MaxInstances       <%= p('proftpd.max_instances') %>
+PidFile            /var/vcap/sys/run/proftpd/proftpd.pid
+ScoreboardFile     /var/vcap/sys/run/proftpd/proftpd.scoreboard
+DefaultRoot        <%= p('proftpd.default_root') %>
+UseReverseDNS      off
+RequireValidShell  off
+Umask              022
+User               vcap
+Group              vcap
+ModulePath         /var/vcap/packages/proftpd/libexec
+
+<%- if p_truthy("proftpd.local_auth.enabled") -%>
+AuthUserFile       /var/vcap/data/proftpd/config/local_auth.users
+AuthGroupFile      /var/vcap/jobs/proftpd/config/local_auth.groups
+<%- end -%>
+
+# --- Logging ---
+SystemLog          <%= p_truthy("proftpd.logs.system.enabled") ? "/var/vcap/sys/log/proftpd/proftpd.log" : "none" %>
+<%- if p_truthy("proftpd.logs.extended.enabled") -%>
+  <%- if_p("proftpd.logs.extended.format") do |extended_fmt| -%>
+LogFormat          custom_log_fmt "<%= extended_fmt %>"
+ExtendedLog        /var/vcap/sys/log/proftpd/extended-log ALL custom_log_fmt
+  <%- end -%>
+<%- end -%>
+
+# --- Raw config closing ---
+<% p('proftpd.raw_config.closing', []).each do |line| -%>
+  <%= line %>
+<%- end -%>
+
+# --- Modules ---
+<%- if p_truthy("proftpd.mod_prometheus.enabled") -%>
+<% p('proftpd.mod_prometheus.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<IfModule mod_prometheus.c>
+  PrometheusEngine          on
+  PrometheusExporter        <%= p_truthy("proftpd.mod_prometheus.listen_on_instance_ip") ? spec.ip : "0.0.0.0" %>:<%= p('proftpd.mod_prometheus.exporter_port') %>
+  PrometheusTables          /var/vcap/data/proftpd/mod_prometheus
+  PrometheusLog             /var/vcap/sys/log/proftpd/mod_prometheus.log
+  PrometheusOptions         EnableLogMessageMetrics
+  <% p('proftpd.mod_prometheus.raw_config.closing', []).each do |line| -%>
+  <%= line %>
+  <%- end -%>
+</IfModule>
+<% p('proftpd.mod_prometheus.raw_config.epilogue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<%- end -%>
+
+<%- if p_truthy("proftpd.mod_sql.enabled") -%>
+# MySQL auth via mod_sql + mod_sql_mysql
+<% p('proftpd.mod_sql.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<IfModule mod_sql.c>
+  SQLEngine                 on
+  SQLBackend                <%= p('proftpd.mod_sql.sql_backend') %>
+  SQLConnectInfo            <%= p('proftpd.mod_sql.sql_connect_info') %>
+  SQLAuthTypes              <%= p('proftpd.mod_sql.sql_auth_types') %>
+  SQLUserInfo               <%= p('proftpd.mod_sql.sql_user_info') %>
+  SQLGroupInfo              <%= p('proftpd.mod_sql.sql_group_info') %>
+  SQLLogFile                <%= p_truthy("proftpd.mod_sql.log_sql_queries") ? "/var/vcap/sys/log/proftpd/mod_sql.log" : "none" %>
+  <% p('proftpd.mod_sql.raw_config.closing', []).each do |line| -%>
+  <%= line %>
+  <%- end -%>
+</IfModule>
+<% p('proftpd.mod_sql.raw_config.epilogue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<%- end -%>
+
+<%- if p_truthy("proftpd.mod_wrap2.enabled") -%>
+# Wrap2 (allow/deny rules without tcp_wrappers)
+<% p('proftpd.mod_wrap2.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<IfModule mod_wrap2.c>
+  WrapEngine                on
+  WrapLog                   /var/vcap/sys/log/proftpd/mod_wrap2.log
+  WrapTables                file:/var/vcap/jobs/proftpd/config/mod_wrap2/write_tables
+  <% p('proftpd.mod_wrap2.raw_config.closing', []).each do |line| -%>
+  <%= line %>
+  <%- end -%>
+</IfModule>
+<% p('proftpd.mod_wrap2.raw_config.epilogue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<%- end -%>
+
+<%- if p_truthy("proftpd.mod_tls.enabled") -%>
+# Crypto (TLS)
+<% p('proftpd.mod_tls.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<IfModule mod_tls.c>
+  TLSEngine                 on
+  TLSLog                    /var/vcap/sys/log/proftpd/mod_tls.log
+  TLSProtocol               <%= p('proftpd.mod_tls.tls_protocol') %>
+  TLSOptions                <%= p('proftpd.mod_tls.tls_options') %>
+  TLSRequired               <%= p('proftpd.mod_tls.tls_required') %>
+  TLSRSACertificateFile     /var/vcap/jobs/proftpd/config/mod_tls/server.crt
+  TLSRSACertificateKeyFile  /var/vcap/jobs/proftpd/config/mod_tls/server.key
+  <% p('proftpd.mod_tls.raw_config.closing', []).each do |line| -%>
+  <%= line %>
+  <%- end -%>
+</IfModule>
+<% p('proftpd.mod_tls.raw_config.epilogue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<%- end -%>
+
+<%- if p_truthy("proftpd.mod_sftp.enabled") -%>
+# SFTP (uses OpenSSL internally)
+<% p('proftpd.mod_sftp.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<IfModule mod_sftp.c>
+  SFTPEngine                on
+  SFTPHostKey               /var/vcap/jobs/proftpd/config/mod_tls/ssh_host_rsa_key
+  <% p('proftpd.mod_sftp.raw_config.closing', []).each do |line| -%>
+  <%= line %>
+  <%- end -%>
+</IfModule>
+<% p('proftpd.mod_sftp.raw_config.epilogue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<%- end -%>
+
+# --- Raw config epilogue ---
+<% p('proftpd.raw_config.epilogue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+
+<%# @formatter:on -%>

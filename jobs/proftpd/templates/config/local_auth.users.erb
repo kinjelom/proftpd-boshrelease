@@ -1,0 +1,18 @@
+<%-
+  users = p("proftpd.local_auth.users", []) || []
+  default_homes = "/var/vcap/store/proftpd/data/homes"
+  default_uid  = 1000  # vcap
+  default_gid  = 1000  # vcap
+-%>
+<%# @formatter:off -%>
+<%- users.each do |u| -%>
+  <%-
+    name = u.fetch("name")
+    pass = u.fetch("password") # plaintext; pre-start will hash
+    uid  = (u["uid"] || default_uid).to_i
+    gid  = (u["gid"] || default_gid).to_i
+    home = (u["home"] || default_homes+"/"+name).to_s
+  -%>
+<%= name %>:<%= pass %>:<%= uid %>:<%= gid %>::<%= home %>:/bin/false
+<%- end -%>
+<%# @formatter:on -%>

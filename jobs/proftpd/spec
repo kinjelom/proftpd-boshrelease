@@ -1,0 +1,336 @@
+---
+name: proftpd
+packages:
+- proftpd
+- mariadb-connector-c
+- libmicrohttpd
+- sqlite
+- zlib
+templates:
+  bin/ctl.sh.erb: bin/ctl.sh
+  bin/pre-start.sh.erb: bin/pre-start
+  bin/prepare-local-auth.sh.erb: bin/prepare-local-auth.sh
+  config/proftpd.conf.erb: config/proftpd.conf
+  config/local_auth.users.erb: config/local_auth.users.to-fill
+  config/local_auth.groups.erb: config/local_auth.groups
+  config/mod_sftp/ssh_host_rsa_key.erb: config/mod_sftp/ssh_host_rsa_key
+  config/mod_tls/server.crt.erb: config/mod_tls/server.crt
+  config/mod_tls/server.key.erb: config/mod_tls/server.key
+  config/mod_wrap2/write_tables.erb: config/mod_wrap2/write_tables
+
+properties:
+
+  proftpd.server_name:
+    description: "FTP banner/server name reported to clients."
+    default: "ProFTPD"
+
+  proftpd.port:
+    description: "TCP port the ProFTPD server listens on."
+    default: 1021
+
+  proftpd.listen_on_instance_ip:
+    description: >
+      If true, ProFTPD binds only to the VM's instance IP (spec.ip).
+      If false, it binds to 0.0.0.0 and listens on all interfaces.
+    default: false
+
+  proftpd.passive_ports:
+    description: >
+      Range of TCP ports to be used for passive FTP data connections.
+      This should be a contiguous range (min max), e.g. "50000 50100".
+      Make sure the same range is allowed in firewalls and load-balancers,
+      and configured identically on all nodes behind a load-balancer.
+    default: ~
+    example: "50000 50100"
+
+  proftpd.masquerade_address:
+    description: >
+      The external IP address or hostname that ProFTPD should advertise
+      to FTP clients in PASV responses. Usually this is the public
+      address of a NAT gateway or load-balancer, not the internal
+      address of the node. All nodes behind the same load-balancer
+      should use the same value.
+    default: ~
+
+  proftpd.max_instances:
+    description: "Maximum number of concurrent child processes (connections)."
+    default: 50
+
+  proftpd.default_root:
+    description: "Base directory users are chrooted into after login (DefaultRoot)."
+    default: "/var/vcap/store/proftpd/data"
+
+  proftpd.logs.system.enabled:
+    description: "Enable SystemLog (otherwise 'SystemLog none')."
+    default: true
+
+  proftpd.logs.extended.enabled:
+    description: "Enable extended logging."
+    default: false
+
+  proftpd.logs.extended.format:
+    description: "Custom LogFormat string used with ExtendedLog; when empty, the default xferlog format is used."
+    default: '{ "host": "%h", "user": "%u", "time": "%T", "bytes": %b, "method": "%m", "file": "%f", "status": %s }'
+
+  proftpd.local_auth.enabled:
+    description: >
+      Enables local (virtual) authentication using AuthUserFile/AuthGroupFile.
+      When set to true, the job will render user and group files from the
+      properties `proftpd.local_auth.users` and `proftpd.local_auth.groups`.
+      When false, no local accounts will be created and authentication must
+      be provided by other modules (e.g., mod_sql).
+    default: false
+
+  proftpd.local_auth.users:
+    description: >
+      Ordered list of local (virtual) users to be rendered into the AuthUserFile.
+      Each item supports:
+        - name: login name (required)
+        - password: plaintext password (required; will be hashed)
+        - uid: numeric UID to write into the passwd entry; defaults to vcap UID (1000) if omitted
+        - gid: numeric GID to write into the passwd entry; defaults to vcap GID (1000) if omitted
+        - home: home directory; defaults to /var/vcap/store/proftpd/data/homes/<name> if omitted
+      Notes:
+        - The generated file is passwd-like (name:passwd/placeholder:uid:gid::home:/bin/false).
+        - Use CredHub to provide secrets (e.g., ((ftp_user_password))) instead of hardcoding.
+    default: []
+
+  proftpd.local_auth.groups:
+    description: >
+      List of local (virtual) groups to be rendered into the AuthGroupFile.
+      Each item supports:
+        - name: group name (required)
+        - gid: numeric GID to write into the group entry; defaults to vcap GID (1000) if omitted
+        - members: list of usernames that should be part of this group
+      Notes:
+        - This is useful to control access to directories or resources
+          via group membership restrictions in proftpd.conf.
+    default: []
+
+
+  proftpd.mod_prometheus.enabled:
+    description: >
+      Enable or disable the mod_prometheus metrics exporter.
+      When enabled, ProFTPD loads mod_prometheus and exposes metrics
+      over HTTP for Prometheus scraping.
+    default: true
+
+  proftpd.mod_prometheus.exporter_port:
+    description: "TCP port on which mod_prometheus HTTP exporter listens for Prometheus scrapes"
+    default: 9273
+
+  proftpd.mod_prometheus.listen_on_instance_ip:
+    description: >
+      If true, exporter binds only to the VM's instance IP (spec.ip).
+      If false, it binds to 0.0.0.0 and listens on all interfaces.
+    default: false
+
+  proftpd.mod_prometheus.raw_config.prologue:
+    description: >
+      Lines inserted before the `<IfModule>` directive (default includes LoadModule)."
+      Note: most directives use the last value; some accumulate.
+    default:
+      - LoadModule mod_prometheus.c
+  proftpd.mod_prometheus.raw_config.closing:
+    description: >
+      Lines inserted at the end the `<IfModule>` block, before `</IfModule>`.
+      Note: most directives use the last value; some accumulate.
+    default: []
+  proftpd.mod_prometheus.raw_config.epilogue:
+    description: >
+      Lines inserted after the `</IfModule>` block.
+      Note: most directives use the last value; some accumulate.
+    default: []
+
+
+  proftpd.mod_sql.enabled:
+    description: "Enable SQL-based authentication using mod_sql and mod_sql_mysql."
+    default: false
+
+  proftpd.mod_sql.sql_backend:
+    description: "mod_sql backend to use (e.g., 'mysql', 'postgres')."
+    default: "mysql"
+
+  proftpd.mod_sql.sql_connect_info:
+    description: "Arguments for SQLConnectInfo in the form: 'database@host:port username password'."
+    example: "proftpd@db:3306 proftpd_user proftpd_pass"
+
+  proftpd.mod_sql.sql_auth_types:
+    description: "Space-separated auth types accepted by mod_sql (e.g., 'Plaintext Crypt', or with mod_sql_passwd 'Crypt PBKDF2')."
+    default: "Plaintext Crypt"
+
+  proftpd.mod_sql.log_sql_queries:
+    description: "Enable verbose SQL query logging to a file (useful for debugging/tuning)."
+    default: false
+
+  proftpd.mod_sql.sql_user_info:
+    description: >
+      SQLUserInfo mapping: either a named query (preferred) or a table/column mapping for user lookups.
+      Example named query to return: passwd, uid, gid, homedir, shell:
+        SQLNamedQuery get-user-info SELECT "u.passwd, u.uid, u.gid, u.homedir, u.shell FROM users u WHERE u.userid = '%u'"
+      Suggested MySQL DDL:
+        CREATE TABLE users (
+          userid     VARCHAR(64)  NOT NULL,
+          passwd     VARCHAR(255) NOT NULL,         -- crypt/sha512/pbkdf2 hash
+          uid        INT          NOT NULL,         -- e.g., 1000 (vcap)
+          gid        INT          NOT NULL,
+          homedir    VARCHAR(255) NOT NULL,
+          shell      VARCHAR(64)  NOT NULL DEFAULT '/bin/false',
+          logins     INT          NOT NULL DEFAULT 0,
+          last_login DATETIME     NULL,
+          modified   DATETIME     NULL,
+          PRIMARY KEY (userid),
+          KEY idx_users_uid (uid),
+          KEY idx_users_gid (gid)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    default: "custom:/get-user-info"
+
+  proftpd.mod_sql.sql_group_info:
+    description: >
+      SQLGroupInfo mapping: either a named query (preferred) or a table/column mapping for group lookups.
+      Example named query to return: gid, members:
+        SQLNamedQuery get-group-info SELECT "g.gid, g.members FROM groups g WHERE g.groupname = '%{0}'"
+      Suggested MySQL DDL:
+        CREATE TABLE groups (
+          groupname VARCHAR(64) NOT NULL,
+          gid       INT         NOT NULL,
+          members   TEXT        NOT NULL,  -- users list separated by spaces (mod_sql format)
+          PRIMARY KEY (groupname),
+          KEY idx_groups_gid (gid)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    default: "custom:/get-group-info"
+
+  proftpd.mod_sql.raw_config.prologue:
+    description: >
+      Lines inserted before the `<IfModule>` directive (default includes LoadModule)."
+      Note: most directives use the last value; some accumulate.
+    default:
+    - LoadModule mod_sql.c
+    - LoadModule mod_sql_mysql.c
+  proftpd.mod_sql.raw_config.closing:
+    description: >
+      Lines inserted inside the `<IfModule>` block, before `</IfModule>`.
+      Note: most directives use the last value; some accumulate.
+    default: []
+  proftpd.mod_sql.raw_config.epilogue:
+    description: >
+      Lines inserted after the `</IfModule>` block.
+      Note: most directives use the last value; some accumulate.
+    default: []
+
+
+  proftpd.mod_wrap2.enabled:
+    description: "Enable access control using mod_wrap2 (and mod_wrap2_file)."
+    default: false
+
+  proftpd.mod_wrap2.write_tables:
+    description: "Lines written to the wrap2 rule file used by mod_wrap2_file."
+    default: []
+
+  proftpd.mod_wrap2.raw_config.prologue:
+    description: >
+      Lines inserted before the `<IfModule>` directive (default includes LoadModule)."
+      Note: most directives use the last value; some accumulate.
+    default:
+    - LoadModule mod_wrap2.c
+    - LoadModule mod_wrap2_file.c
+  proftpd.mod_wrap2.raw_config.closing:
+    description: >
+      Lines inserted inside the `<IfModule>` block, before `</IfModule>`.
+      Note: most directives use the last value; some accumulate.
+    default: []
+  proftpd.mod_wrap2.raw_config.epilogue:
+    description: >
+      Lines inserted after the `</IfModule>` block.
+      Note: most directives use the last value; some accumulate.
+    default: []
+
+
+  proftpd.mod_tls.enabled:
+    description: "Enable TLS support via mod_tls."
+    default: false
+
+  proftpd.mod_tls.tls_protocol:
+    description: "Allowed TLS protocol versions (e.g., 'TLSv1.2 TLSv1.3')."
+    default: "TLSv1.2 TLSv1.3"
+
+  proftpd.mod_tls.tls_options:
+    description: >
+      List of TLSOptions directives passed directly to mod_tls.
+      Options control behavior such as certificate requests,
+      diagnostics, and compatibility tweaks. Multiple options should
+      be separated by spaces. See mod_tls documentation for details.
+    default: "NoCertRequest EnableDiags"
+    example: "NoCertRequest EnableDiags NoSessionReuseRequired"
+
+  proftpd.mod_tls.tls_required:
+    description: "Which channels must use TLS (e.g., 'ctrl+data')."
+    default: "ctrl+data"
+
+  proftpd.mod_tls.server_crt:
+    description: "PEM-encoded server certificate content."
+    default: ""
+
+  proftpd.mod_tls.server_key:
+    description: "PEM-encoded server private key content."
+    default: ""
+
+  proftpd.mod_tls.raw_config.prologue:
+    description: >
+      Lines inserted before the `<IfModule>` directive (default includes LoadModule)."
+      Note: most directives use the last value; some accumulate.
+    default:
+    - LoadModule mod_tls.c
+  proftpd.mod_tls.raw_config.closing:
+    description: >
+      Lines inserted inside the `<IfModule>` block, before `</IfModule>`.
+      Note: most directives use the last value; some accumulate.
+    default: []
+  proftpd.mod_tls.raw_config.epilogue:
+    description: >
+      Lines inserted after the `</IfModule>` block.
+      Note: most directives use the last value; some accumulate.
+    default: []
+
+
+  proftpd.mod_sftp.enabled:
+    description: "Enable SFTP subsystem via mod_sftp."
+    default: false
+
+  proftpd.mod_sftp.ssh_host_rsa_key:
+    description: >
+      PEM-encoded RSA host key used by mod_sftp.
+      It is recommended to declare this property as a CredHub variable:
+      `{name: proftpd_sftp_host_rsa, type: ssh, options: { type: rsa, bits: 4096 }}`
+      This ensures the key is generated, stored, and rotated securely
+      by BOSH CredHub rather than being hardcoded.
+    default: ""
+
+  proftpd.mod_sftp.raw_config.prologue:
+    description: >
+      Lines inserted before the `<IfModule>` directive (default includes LoadModule)."
+      Note: most directives use the last value; some accumulate.
+    default:
+    - LoadModule mod_sftp.c
+  proftpd.mod_sftp.raw_config.closing:
+    description: >
+      Lines inserted inside the `<IfModule>` block, before `</IfModule>`.
+      Note: most directives use the last value; some accumulate.
+    default: []
+  proftpd.mod_sftp.raw_config.epilogue:
+    description: >
+      Lines inserted after the `</IfModule>` block.
+      Note: most directives use the last value; some accumulate.
+    default: []
+
+  proftpd.raw_config.prologue:
+    description: "Ordered list of raw directive lines appended at the start of the file."
+    default: []
+
+  proftpd.raw_config.closing:
+    description: "Ordered list of raw directive lines appended at the end of the root context, before the modules section directives."
+    default: []
+
+  proftpd.raw_config.epilogue:
+    description: "Ordered list of raw directive lines appended at the end of the file."
+    default: []

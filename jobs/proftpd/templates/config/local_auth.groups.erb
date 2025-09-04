@@ -1,0 +1,8 @@
+<%-
+  groups = p("proftpd.local_auth.groups", []) || []
+-%>
+<%# @formatter:off -%>
+<%- groups.each do |line| -%>
+<%= line %>
+<%- end -%>
+<%# @formatter:on -%>

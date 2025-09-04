@@ -1,0 +1,6 @@
+---
+name: mariadb-connector-c
+dependencies: []
+files:
+- meta-info/blobs-versions.env
+- mariadb/mariadb-connector-c-*-src.tar.gz
