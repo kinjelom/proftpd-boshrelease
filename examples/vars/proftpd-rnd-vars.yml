@@ -2,5 +2,8 @@ proftpd_azs: [z2]
 proftpd_instances: 1
 proftpd_vm_type: default
 proftpd_persistent_disk_type: 5GB
-proftpd_port: 1021
+
+ftps_port: 2121
+sftp_port: 2222
 prometheus_exporter_port: 9273
+proftpd_tls_common_name: proftpd-rnd.example.org
