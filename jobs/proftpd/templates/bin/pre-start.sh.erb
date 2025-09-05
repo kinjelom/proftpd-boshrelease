@@ -5,8 +5,10 @@ JOB_DIR=/var/vcap/jobs/proftpd
 RUN_DIR=/var/vcap/sys/run/proftpd
 LOG_DIR=/var/vcap/sys/log/proftpd
 DATA_DIR=/var/vcap/data/proftpd
-
+PKG_DIR=/var/vcap/packages/proftpd
 DEFAULT_ROOT='<%= p("proftpd.default_root") %>'
+
+source "$PKG_DIR/bosh-utils/script_utils.sh"
 
 mkdir -p "$DEFAULT_ROOT" "$DATA_DIR/config" "$DATA_DIR/mod_prometheus" "$RUN_DIR" "$LOG_DIR"
 chown -R vcap:vcap "$DEFAULT_ROOT" "$DATA_DIR" "$RUN_DIR" "$LOG_DIR"
@@ -14,6 +16,11 @@ chmod 0750 "$DEFAULT_ROOT" "$DATA_DIR" "$DATA_DIR/config" "$DATA_DIR/mod_prometh
 
 # mkdir -p "$DATA_DIR/mod_prometheus/empty"
 # chmod 0111 "$DATA_DIR/mod_prometheus/empty"
+
+# Ensure tight perms on directory and key
+SFTP_DIR="/var/vcap/jobs/proftpd/config/mod_sftp"
+chmod 0700 "$SFTP_DIR"
+chmod 0600 "${SFTP_DIR}/ssh_host_rsa_key"
 
 exec >>"$LOG_DIR/pre-start.stdout.log" 2>>"$LOG_DIR/pre-start.stderr.log"
 
@@ -31,10 +38,10 @@ ALL_PKG_DIR="/var/vcap/packages"
 CONF_FILE="$JOB_DIR/config/proftpd.conf"
 export LD_LIBRARY_PATH="${ALL_PKG_DIR}/proftpd/lib:${ALL_PKG_DIR}/lib/mariadb:${ALL_PKG_DIR}/sqlite/lib:${ALL_PKG_DIR}/libmicrohttpd/lib:${ALL_PKG_DIR}/zlib/lib:${LD_LIBRARY_PATH:-}"
 if ! "$ALL_PKG_DIR/proftpd/sbin/proftpd" -t -c "$CONF_FILE"; then
-  echo "[pre-start] ERROR: proftpd.conf is invalid, aborting."
+  log_error "[pre-start] ERROR: proftpd.conf is invalid, aborting."
   exit 1
 else
-  echo "[pre-start] SUCCESS: proftpd.conf is valid"
+  log_info "[pre-start] SUCCESS: proftpd.conf is valid"
 fi
 
-echo "[pre-start] ProFTPD config OK."
+log_info "[pre-start] ProFTPD config OK."

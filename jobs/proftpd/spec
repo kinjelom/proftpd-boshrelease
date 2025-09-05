@@ -14,6 +14,7 @@ templates:
   config/local_auth.users.erb: config/local_auth.users.to-fill
   config/local_auth.groups.erb: config/local_auth.groups
   config/mod_sftp/ssh_host_rsa_key.erb: config/mod_sftp/ssh_host_rsa_key
+  config/mod_tls/ca.crt.erb: config/mod_tls/ca.crt
   config/mod_tls/server.crt.erb: config/mod_tls/server.crt
   config/mod_tls/server.key.erb: config/mod_tls/server.key
   config/mod_wrap2/write_tables.erb: config/mod_wrap2/write_tables
@@ -26,7 +27,7 @@ properties:
 
   proftpd.port:
     description: "TCP port the ProFTPD server listens on."
-    default: 1021
+    default: 2121
 
   proftpd.listen_on_instance_ip:
     description: >
@@ -45,6 +46,7 @@ properties:
 
   proftpd.masquerade_address:
     description: >
+      Set to your LB/public IP or FQDN.
       The external IP address or hostname that ProFTPD should advertise
       to FTP clients in PASV responses. Usually this is the public
       address of a NAT gateway or load-balancer, not the internal
@@ -59,6 +61,38 @@ properties:
   proftpd.default_root:
     description: "Base directory users are chrooted into after login (DefaultRoot)."
     default: "/var/vcap/store/proftpd/data"
+
+
+  proftpd.default_server:
+    description: "DefaultServer"
+    default: "on"
+
+  proftpd.use_ip_v6:
+    description: >
+      Enables or disables IPv6 support. When set to "on", the server will
+      listen on both IPv4 and IPv6 sockets (if available). Default is "off"
+      to avoid binding to IPv6 when not needed.
+    default: "off"
+
+  proftpd.umask:
+    description: >
+      Sets the default umask for newly created files and directories.
+      For example "022" gives 755 for directories and 644 for files.
+    default: "022"
+
+  proftpd.use_reverse_dns:
+    description: >
+      Controls whether reverse DNS lookups are performed on client IP
+      addresses. Default "off" is recommended to avoid login delays if
+      DNS is slow or misconfigured.
+    default: "off"
+
+  proftpd.require_valid_shell:
+    description: >
+      If "on", users must have a valid login shell listed in /etc/shells
+      to authenticate. Default "off" allows virtual users with /bin/false
+      or other non-login shells.
+    default: "off"
 
   proftpd.logs.system.enabled:
     description: "Enable SystemLog (otherwise 'SystemLog none')."
@@ -108,12 +142,45 @@ properties:
     default: []
 
 
+  proftpd.mod_ctrls_admin.enabled:
+    description: >
+      Enable or disable the mod_ctrls_admin for graceful shutdown via ftpdctl (pre-start).
+      Adds administrative controls actions for the ftpdctl program.
+      Controls are covered in more detail in the Controls mini-HOWTO: http://www.proftpd.org/docs/howto/Controls.html
+      http://www.proftpd.org/docs/contrib/mod_ctrls_admin.html
+    default: true
+
+  proftpd.mod_ctrls_admin.raw_config.prologue:
+    description: >
+      Lines inserted before the module block (default includes LoadModule)."
+      Note: most directives use the last value; some accumulate.
+    default:
+      - LoadModule mod_ctrls_admin.c
+  proftpd.mod_ctrls_admin.raw_config.closing:
+    description: >
+      Lines inserted at the end the `<IfModule>` block, before `</IfModule>`.
+      Note: most directives use the last value; some accumulate.
+    default:
+    - AdminControlsACLs all allow user vcap
+    - AdminControlsACLs all allow user root
+  proftpd.mod_ctrls_admin.raw_config.epilogue:
+    description: >
+      Lines inserted after the module block.
+      Note: most directives use the last value; some accumulate.
+    default: []
+
+
   proftpd.mod_prometheus.enabled:
     description: >
       Enable or disable the mod_prometheus metrics exporter.
       When enabled, ProFTPD loads mod_prometheus and exposes metrics
       over HTTP for Prometheus scraping.
+      https://htmlpreview.github.io/?https://github.com/Castaglia/proftpd-mod_prometheus/blob/master/mod_prometheus.html
     default: true
+
+  proftpd.mod_prometheus.logs_enabled:
+    description: "Enable logs for mod_prometheus."
+    default: false
 
   proftpd.mod_prometheus.exporter_port:
     description: "TCP port on which mod_prometheus HTTP exporter listens for Prometheus scrapes"
@@ -127,7 +194,7 @@ properties:
 
   proftpd.mod_prometheus.raw_config.prologue:
     description: >
-      Lines inserted before the `<IfModule>` directive (default includes LoadModule)."
+      Lines inserted before the module block (default includes LoadModule)."
       Note: most directives use the last value; some accumulate.
     default:
       - LoadModule mod_prometheus.c
@@ -136,136 +203,29 @@ properties:
       Lines inserted at the end the `<IfModule>` block, before `</IfModule>`.
       Note: most directives use the last value; some accumulate.
     default: []
+    example:
+    - PrometheusOptions EnableLogMessageMetrics
   proftpd.mod_prometheus.raw_config.epilogue:
     description: >
-      Lines inserted after the `</IfModule>` block.
-      Note: most directives use the last value; some accumulate.
-    default: []
-
-
-  proftpd.mod_sql.enabled:
-    description: "Enable SQL-based authentication using mod_sql and mod_sql_mysql."
-    default: false
-
-  proftpd.mod_sql.sql_backend:
-    description: "mod_sql backend to use (e.g., 'mysql', 'postgres')."
-    default: "mysql"
-
-  proftpd.mod_sql.sql_connect_info:
-    description: "Arguments for SQLConnectInfo in the form: 'database@host:port username password'."
-    example: "proftpd@db:3306 proftpd_user proftpd_pass"
-
-  proftpd.mod_sql.sql_auth_types:
-    description: "Space-separated auth types accepted by mod_sql (e.g., 'Plaintext Crypt', or with mod_sql_passwd 'Crypt PBKDF2')."
-    default: "Plaintext Crypt"
-
-  proftpd.mod_sql.log_sql_queries:
-    description: "Enable verbose SQL query logging to a file (useful for debugging/tuning)."
-    default: false
-
-  proftpd.mod_sql.sql_user_info:
-    description: >
-      SQLUserInfo mapping: either a named query (preferred) or a table/column mapping for user lookups.
-      Example named query to return: passwd, uid, gid, homedir, shell:
-        SQLNamedQuery get-user-info SELECT "u.passwd, u.uid, u.gid, u.homedir, u.shell FROM users u WHERE u.userid = '%u'"
-      Suggested MySQL DDL:
-        CREATE TABLE users (
-          userid     VARCHAR(64)  NOT NULL,
-          passwd     VARCHAR(255) NOT NULL,         -- crypt/sha512/pbkdf2 hash
-          uid        INT          NOT NULL,         -- e.g., 1000 (vcap)
-          gid        INT          NOT NULL,
-          homedir    VARCHAR(255) NOT NULL,
-          shell      VARCHAR(64)  NOT NULL DEFAULT '/bin/false',
-          logins     INT          NOT NULL DEFAULT 0,
-          last_login DATETIME     NULL,
-          modified   DATETIME     NULL,
-          PRIMARY KEY (userid),
-          KEY idx_users_uid (uid),
-          KEY idx_users_gid (gid)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    default: "custom:/get-user-info"
-
-  proftpd.mod_sql.sql_group_info:
-    description: >
-      SQLGroupInfo mapping: either a named query (preferred) or a table/column mapping for group lookups.
-      Example named query to return: gid, members:
-        SQLNamedQuery get-group-info SELECT "g.gid, g.members FROM groups g WHERE g.groupname = '%{0}'"
-      Suggested MySQL DDL:
-        CREATE TABLE groups (
-          groupname VARCHAR(64) NOT NULL,
-          gid       INT         NOT NULL,
-          members   TEXT        NOT NULL,  -- users list separated by spaces (mod_sql format)
-          PRIMARY KEY (groupname),
-          KEY idx_groups_gid (gid)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    default: "custom:/get-group-info"
-
-  proftpd.mod_sql.raw_config.prologue:
-    description: >
-      Lines inserted before the `<IfModule>` directive (default includes LoadModule)."
-      Note: most directives use the last value; some accumulate.
-    default:
-    - LoadModule mod_sql.c
-    - LoadModule mod_sql_mysql.c
-  proftpd.mod_sql.raw_config.closing:
-    description: >
-      Lines inserted inside the `<IfModule>` block, before `</IfModule>`.
-      Note: most directives use the last value; some accumulate.
-    default: []
-  proftpd.mod_sql.raw_config.epilogue:
-    description: >
-      Lines inserted after the `</IfModule>` block.
-      Note: most directives use the last value; some accumulate.
-    default: []
-
-
-  proftpd.mod_wrap2.enabled:
-    description: "Enable access control using mod_wrap2 (and mod_wrap2_file)."
-    default: false
-
-  proftpd.mod_wrap2.write_tables:
-    description: "Lines written to the wrap2 rule file used by mod_wrap2_file."
-    default: []
-
-  proftpd.mod_wrap2.raw_config.prologue:
-    description: >
-      Lines inserted before the `<IfModule>` directive (default includes LoadModule)."
-      Note: most directives use the last value; some accumulate.
-    default:
-    - LoadModule mod_wrap2.c
-    - LoadModule mod_wrap2_file.c
-  proftpd.mod_wrap2.raw_config.closing:
-    description: >
-      Lines inserted inside the `<IfModule>` block, before `</IfModule>`.
-      Note: most directives use the last value; some accumulate.
-    default: []
-  proftpd.mod_wrap2.raw_config.epilogue:
-    description: >
-      Lines inserted after the `</IfModule>` block.
+      Lines inserted after the module block.
       Note: most directives use the last value; some accumulate.
     default: []
 
 
   proftpd.mod_tls.enabled:
-    description: "Enable TLS support via mod_tls."
+    description: >
+      Enable FTPS subsystem (ftps://) via mod_tls.
+      Adds the ability to encrypt the control and data connections using SSL/TLS
+      http://www.proftpd.org/docs/contrib/mod_tls.html
     default: false
 
-  proftpd.mod_tls.tls_protocol:
-    description: "Allowed TLS protocol versions (e.g., 'TLSv1.2 TLSv1.3')."
-    default: "TLSv1.2 TLSv1.3"
+  proftpd.mod_tls.logs_enabled:
+    description: "Enable logs for mod_tls's reporting, used with 'TLSOptions EnableDiags'."
+    default: false
 
-  proftpd.mod_tls.tls_options:
-    description: >
-      List of TLSOptions directives passed directly to mod_tls.
-      Options control behavior such as certificate requests,
-      diagnostics, and compatibility tweaks. Multiple options should
-      be separated by spaces. See mod_tls documentation for details.
-    default: "NoCertRequest EnableDiags"
-    example: "NoCertRequest EnableDiags NoSessionReuseRequired"
-
-  proftpd.mod_tls.tls_required:
-    description: "Which channels must use TLS (e.g., 'ctrl+data')."
-    default: "ctrl+data"
+  proftpd.mod_tls.ca_crt:
+    description: "PEM-encoded CA certificate content."
+    default: ""
 
   proftpd.mod_tls.server_crt:
     description: "PEM-encoded server certificate content."
@@ -277,51 +237,146 @@ properties:
 
   proftpd.mod_tls.raw_config.prologue:
     description: >
-      Lines inserted before the `<IfModule>` directive (default includes LoadModule)."
+      Lines inserted before the module block (default includes LoadModule)."
       Note: most directives use the last value; some accumulate.
     default:
     - LoadModule mod_tls.c
   proftpd.mod_tls.raw_config.closing:
     description: >
-      Lines inserted inside the `<IfModule>` block, before `</IfModule>`.
+      Lines inserted at the end the module block.
       Note: most directives use the last value; some accumulate.
-    default: []
+    default:
+    - TLSRequired on
+    - TLSProtocol TLSv1.2 TLSv1.3
+    - TLSVerifyClient off
+    # - TLSOptions EnableDiags
   proftpd.mod_tls.raw_config.epilogue:
     description: >
-      Lines inserted after the `</IfModule>` block.
+      Lines inserted after the module block.
       Note: most directives use the last value; some accumulate.
     default: []
 
 
   proftpd.mod_sftp.enabled:
+    description: >
+      Enable SFTP (sftp://) subsystem via mod_sftp.
+      http://www.proftpd.org/docs/contrib/mod_sftp.html
+    default: false
+
+  proftpd.mod_sftp.logs_enabled:
+    description: "Enable logs for mod_sftp's reporting on a per-server basis."
+    default: false
+
+  proftpd.mod_sftp.port:
     description: "Enable SFTP subsystem via mod_sftp."
+    default: 2222
+
+  proftpd.mod_sftp.listen_on_instance_ip:
+    description: >
+      If true, server binds only to the VM's instance IP (spec.ip).
+      If false, it binds to 0.0.0.0 and listens on all interfaces.
     default: false
 
   proftpd.mod_sftp.ssh_host_rsa_key:
     description: >
       PEM-encoded RSA host key used by mod_sftp.
       It is recommended to declare this property as a CredHub variable:
-      `{name: proftpd_sftp_host_rsa, type: ssh, options: { type: rsa, bits: 4096 }}`
+      `{ name: proftpd_sftp_host_rsa, type: rsa }`
       This ensures the key is generated, stored, and rotated securely
       by BOSH CredHub rather than being hardcoded.
     default: ""
 
   proftpd.mod_sftp.raw_config.prologue:
     description: >
-      Lines inserted before the `<IfModule>` directive (default includes LoadModule)."
+      Lines inserted before the module block (default includes LoadModule)."
       Note: most directives use the last value; some accumulate.
     default:
     - LoadModule mod_sftp.c
   proftpd.mod_sftp.raw_config.closing:
     description: >
-      Lines inserted inside the `<IfModule>` block, before `</IfModule>`.
+      Lines inserted at the end the module block.
       Note: most directives use the last value; some accumulate.
     default: []
   proftpd.mod_sftp.raw_config.epilogue:
     description: >
-      Lines inserted after the `</IfModule>` block.
+      Lines inserted after the module block.
       Note: most directives use the last value; some accumulate.
     default: []
+
+
+  proftpd.mod_sql.enabled:
+    description: >
+      Enable SQL-based authentication using mod_sql and mod_sql_mysql.
+      http://www.proftpd.org/docs/contrib/mod_sql.html
+    default: false
+
+  proftpd.mod_sql.logs_enabled:
+    description: "Enable verbose SQL query logging to a file (useful for debugging/tuning)."
+    default: false
+
+  proftpd.mod_sql.raw_config.prologue:
+    description: >
+      Lines inserted before the module block (default includes LoadModule)."
+      Note: most directives use the last value; some accumulate.
+    default:
+    - LoadModule mod_sql.c
+    - LoadModule mod_sql_mysql.c
+  proftpd.mod_sql.raw_config.closing:
+    description: >
+      Lines inserted at the end the module block.
+      Note: most directives use the last value; some accumulate.
+    default: []
+    example:
+    - SQLBackend mysql
+    - SQLConnectInfo proftpd@db:3306 proftpd_user proftpd_pass
+    - SQLAuthTypes Plaintext Crypt
+    - SQLUserInfo custom:/get-user-info
+    - SQLGroupInfo custom:/get-group-info
+
+  proftpd.mod_sql.raw_config.epilogue:
+    description: >
+      Lines inserted after the module block.
+      Note: most directives use the last value; some accumulate.
+    default: []
+
+
+  proftpd.mod_wrap2.enabled:
+    description: >
+      Enable access control using mod_wrap2 (and mod_wrap2_file).
+      http://www.proftpd.org/docs/contrib/mod_wrap2.html
+    default: false
+
+  proftpd.mod_wrap2.logs_enabled:
+    description: "Enable logs for mod_wrap2."
+    default: false
+
+  proftpd.mod_wrap2.write_tables:
+    description: "Lines written to the wrap2 rule file used by mod_wrap2_file."
+    default: []
+
+  proftpd.mod_wrap2.raw_config.prologue:
+    description: >
+      Lines inserted before the module block (default includes LoadModule)."
+      Note: most directives use the last value; some accumulate.
+    default:
+    - LoadModule mod_wrap2.c
+    - LoadModule mod_wrap2_file.c
+  proftpd.mod_wrap2.raw_config.closing:
+    description: >
+      Lines inserted at the end the module block.
+      Note: most directives use the last value; some accumulate.
+    default: []
+  proftpd.mod_wrap2.raw_config.epilogue:
+    description: >
+      Lines inserted after the module block.
+      Note: most directives use the last value; some accumulate.
+    default: []
+
+# TODO: http://www.proftpd.org/docs/contrib/
+# http://www.proftpd.org/docs/contrib/mod_tls_memcache.html
+# http://www.proftpd.org/docs/contrib/mod_tls_shmcache.html
+# http://www.proftpd.org/docs/contrib/mod_tls_redis.html
+# http://www.proftpd.org/docs/contrib/mod_quotatab_sql.html
 
   proftpd.raw_config.prologue:
     description: "Ordered list of raw directive lines appended at the start of the file."
