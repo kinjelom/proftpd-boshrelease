@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Function to build LD_LIBRARY_PATH from packaged libs
+get_ld_library_path() {
+  local libpath=""
+  local package pd
+
+  for package in "curl" "libmicrohttpd" "mariadb-connector-c" "nghttp2" "openssl" "proftpd" "sqlite" "zlib"; do
+    pd="/var/vcap/packages/$package"
+    [ -d "$pd/lib" ] && libpath="${libpath:+$libpath:}$pd/lib"
+    [ -d "$pd/lib64" ] && libpath="${libpath:+$libpath:}$pd/lib64"
+  done
+
+  echo "${libpath}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+}
+
+function clean_proftpd_leftovers() {
+  local stage="${1:-unknown}"
+  # TERM matching proftpd processes
+  procs=$(pgrep -f '^proftpd: ' || true)
+  if [ -n "$procs" ]; then
+    log_info "[$stage] Found proftpd leftover processes (TERM): $procs"
+    if pkill -TERM -f '^proftpd: '; then
+      log_info "[$stage] Sent SIGTERM to leftover proftpd processes"
+    fi
+  fi
+  sleep 1
+
+  # KILL matching proftpd processes
+  procs=$(pgrep -f '^proftpd: ' || true)
+  if [ -n "$procs" ]; then
+    log_info "[$stage] Found proftpd leftover processes (KILL): $procs"
+    if pkill -KILL -f '^proftpd: '; then
+      log_info "[$stage] Sent SIGKILL to leftover proftpd processes"
+    fi
+  fi
+
+  # Report matching proftpd processes
+  procs=$(pgrep -f '^proftpd: ' || true)
+  if [ -n "$procs" ]; then
+    log_error "[$stage] Still found proftpd leftover processes: $procs"
+  fi
+}

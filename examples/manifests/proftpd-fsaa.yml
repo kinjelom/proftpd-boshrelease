@@ -1,0 +1,119 @@
+name: ((deployment_name))
+
+instance_groups:
+- name: proftpd
+  azs: ((proftpd_azs))
+  instances: ((proftpd_instances))
+  vm_type: ((proftpd_vm_type))
+  stemcell: default
+  networks: [{name: default}]
+  jobs:
+  - name: proftpd
+    release: proftpd
+    tags:
+      prometheus_exporter_port: ((mod_prometheus_exporter_port)) # 9273
+    properties:
+      proftpd:
+        storage:
+          homes_base_dir: ((store_base_path))/homes
+          create_homes_base_dir: false
+        server:
+          name: ((deployment_name))
+          port: ((ftps_port))
+        global:
+          auth_order: "mod_auth_rest.c"
+        logs:
+          server:
+            enabled: true
+          transfer:
+            enabled: true
+          extended:
+            enabled: true
+        mod_prometheus:
+          enabled: true
+          logs_enabled: true
+          exporter_port: ((mod_prometheus_exporter_port))
+        mod_tls:
+          enabled: true
+          logs_enabled: true
+          ca_crt: ((proftpd_tls.ca))
+          server_crt: ((proftpd_tls.certificate))
+          server_key: ((proftpd_tls.private_key))
+          raw_config:
+            closing:
+            - TLSRequired on # full tls
+            - TLSProtocol TLSv1.2 TLSv1.3
+            - TLSVerifyClient off
+        mod_sftp:
+          enabled: true
+          logs_enabled: true
+          port: ((sftp_port))
+          masquerade_address: ((vip_address))
+          ssh_host_rsa_key: ((proftpd_sftp_host_rsa.private_key))
+        mod_auth_rest:
+          enabled: true
+          api_key: key1
+          bearer_token: 77f280ba374a80132dfe7ddaba5af72476be5ba34477448fff901ebc804e4b1e
+          logs_enabled: true
+          log_level: info
+          log_format: json
+  - name: bpm
+    release: bpm
+  - name: fsaa
+    release: proftpd
+    tags:
+      prometheus_exporter_port: ((fsaa_port)) # 9090
+    properties:
+      fsaa:
+        http_server:
+          listen_address: 0.0.0.0:((fsaa_port))
+          banner: "((deployment_name))"
+        storage:
+          homes_base_dir: ((store_base_path))/homes
+        security:
+          authenticator:
+            access_keys:
+              key1: 77f280ba374a80132dfe7ddaba5af72476be5ba34477448fff901ebc804e4b1e
+              key2: d8a949526533f94bc73aaf8830ae325b4cb7609dc0b54cde583aed07db084fbf
+        account_repository:
+          type: sqlite
+          sqlite:
+            db_file_path: ((store_base_path))/db/fs-access-api.db
+            create_db_dir: false
+
+variables:
+
+- name: proftpd_ca
+  type: certificate
+  options:
+    is_ca: true
+    common_name: ((deployment_name))
+- name: proftpd_tls
+  type: certificate
+  options:
+    ca: proftpd_ca
+    common_name: ((proftpd_tls_common_name))
+    alternative_names:
+    - "*.proftpd.default.((deployment_name)).bosh"
+    extended_key_usage: [server_auth]
+
+- name: proftpd_sftp_host_rsa
+  type: rsa
+
+stemcells:
+- alias: default
+  os: ubuntu-jammy
+  version: latest
+
+releases:
+- name: proftpd
+  version: ((proftpd_version))
+- name: bpm
+  version: latest
+
+update:
+  canaries: 0
+  max_in_flight: 1
+  serial: true
+  canary_watch_time: 1000-20000
+  update_watch_time: 1000-20000

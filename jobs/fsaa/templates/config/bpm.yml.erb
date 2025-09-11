@@ -1,0 +1,29 @@
+processes:
+  - name: fsaa
+    executable: /var/vcap/packages/fsaa/bin/fs-access-api
+    args:
+      - --config
+      - "/var/vcap/jobs/fsaa/config/fsaa.yml"
+      - --bootstrap
+      - <%= spec.bootstrap.to_s %> # that is true if the instance is the first instance of its group.
+      # Writable volumes needed by the app
+    additional_volumes:
+      # socket / pid dir
+      - path: <%= File.dirname(p('fsaa.http_server.unix_socket_path')) %>
+        writable: true
+        mount_only: true
+      # Homes root (program creates subdirs here and chmod/chown's them)
+      - path: <%= p('fsaa.storage.homes_base_dir') %>
+        writable: true
+        mount_only: true
+      # SQLite database directory
+      - path: <%= File.dirname(p('fsaa.account_repository.sqlite.db_file_path')) %>
+        writable: true
+        mount_only: true
+    capabilities: [ CHOWN, FSETID ]
+    unsafe:
+      privileged: true
+    env:
+    <%- p("fsaa.env", {}).each do |key, val| -%>
+      <%= key %>: <%= val %>
+    <%- end -%>

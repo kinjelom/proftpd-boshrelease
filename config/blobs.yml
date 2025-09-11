@@ -1,0 +1,44 @@
+devs/curl-8.17.0.tar.gz:
+  size: 4182287
+  object_id: 0a3fa49c-807d-466e-53e6-10c8fd6d758c
+  sha: sha256:e8e74cdeefe5fb78b3ae6e90cd542babf788fa9480029cfcee6fd9ced42b7910
+devs/libmicrohttpd-1.0.2.tar.gz:
+  size: 2198804
+  object_id: ca1746d9-1092-4dab-5307-c6c4a8570036
+  sha: sha256:df324fcd0834175dab07483133902d9774a605bfa298025f69883288fd20a8c7
+devs/nghttp2-1.68.0.tar.gz:
+  size: 2638098
+  object_id: c217387a-8da1-4a22-5e38-8089b532324f
+  sha: sha256:2c16ffc588ad3f9e2613c3fad72db48ecb5ce15bc362fcc85b342e48daf51013
+devs/openssl-3.5.4.tar.gz:
+  size: 53190367
+  object_id: d43d7bae-b655-4a59-6fc6-509f9421c640
+  sha: sha256:967311f84955316969bdb1d8d4b983718ef42338639c621ec4c34fddef355e99
+devs/sqlite-autoconf-3510000.tar.gz:
+  size: 3207443
+  object_id: 5f72b7d4-2f98-41be-4454-e9556f1f19f5
+  sha: sha256:42e26dfdd96aa2e6b1b1be5c88b0887f9959093f650d693cb02eb9c36d146ca5
+devs/zlib-1.3.1.tar.gz:
+  size: 1512791
+  object_id: ee868818-3585-4398-5481-6ceba060127f
+  sha: sha256:9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23
+fsaa/fsaa_0.1.0.tar.gz:
+  size: 11853287
+  object_id: ffb3f44c-4307-41b9-65f6-3e66251b3279
+  sha: sha256:339251309ba0801962317325209f0639f9bc1df556cc9af82f8d392c02500e0a
+mariadb/mariadb-connector-c-3.4.7-src.tar.gz:
+  size: 1378870
+  object_id: 8044592a-20ec-4f69-68ce-2ee1413338e3
+  sha: sha256:33bb61168380af706b9e9531396cca223179ac2f9fe72edeae69e4546d7b7a2b
+proftpd/mod_auth_rest-0.1.0.src.zip:
+  size: 18586
+  object_id: c25cc2c5-a7b6-4cd4-6ebe-d79ef6565d96
+  sha: sha256:b1830d77e25e1b791645c2626202ecdf86a2359994354677e7b68fdf1e2c3bfa
+proftpd/mod_prometheus-0.2.7.src.zip:
+  size: 167173
+  object_id: 37fcee91-590c-4dfb-736d-dda8e1d6ee24
+  sha: sha256:1ae02eede8377b9e0faba7f11eeccc1f04b3caa87f7d182e2a4331dabfb01107
+proftpd/proftpd-1.3.9.tar.gz:
+  size: 19837398
+  object_id: f87d8e19-fb94-4665-5a31-5045d3cc4198
+  sha: sha256:4a5f13b666226813b4da0ade34535d325e204ab16cf8008c7353b1b5a972f74b

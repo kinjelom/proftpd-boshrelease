@@ -1,0 +1,16 @@
+---
+name: proftpd
+dependencies:
+- libmicrohttpd
+- sqlite
+- zlib
+- curl
+- openssl
+- nghttp2
+- mariadb-connector-c
+files:
+- meta-info/blobs-versions.env
+- bosh-utils/*
+- proftpd/proftpd-*.tar.gz
+- proftpd/mod_prometheus-*.src.zip
+- proftpd/mod_auth_rest-*.src.zip

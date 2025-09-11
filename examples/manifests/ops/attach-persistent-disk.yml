@@ -1,0 +1,31 @@
+---
+- type: replace
+  path: /instance_groups/name=proftpd/persistent_disk_type?
+  value: ((proftpd_persistent_disk_type))
+
+
+- type: replace
+  path: /instance_groups/name=proftpd/jobs/name=proftpd/properties?/proftpd?/storage?/create_homes_base_dir?
+  value: true
+
+- type: replace
+  path: /instance_groups/name=proftpd/jobs/name=proftpd/properties?/proftpd?/storage?/create_homes_base_dir_chown?
+  value: "root:vcap"
+
+- type: replace
+  path: /instance_groups/name=proftpd/jobs/name=proftpd/properties?/proftpd?/storage?/create_homes_base_dir_chmod?
+  value: "0755"
+
+
+- type: replace
+  path: /instance_groups/name=proftpd/jobs/name=fsaa/properties?/fsaa?/account_repository?/sqlite?/create_db_dir?
+  value: true
+
+- type: replace
+  path: /instance_groups/name=proftpd/jobs/name=fsaa/properties?/fsaa?/account_repository?/sqlite?/create_db_dir_chown?
+  value: "root:vcap"
+
+- type: replace
+  path: /instance_groups/name=proftpd/jobs/name=fsaa/properties?/fsaa?/account_repository?/sqlite?/create_db_dir_chmod?
+  value: "0751"
+

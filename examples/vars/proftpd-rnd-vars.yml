@@ -1,0 +1,22 @@
+proftpd_version: latest
+
+# Haproxy VIP Address
+vip_address: 10.100.10.100 # lb/haproxy
+
+proftpd_azs: [z2]
+proftpd_instances: 1
+proftpd_vm_type: default
+proftpd_persistent_disk_type: 5GB
+
+ftps_port: 2021 # FTP TLS / explitic
+sftp_port: 2022 # SSH FTP
+mod_prometheus_exporter_port: 9273
+fsaa_port: 9090
+nfsma_port: 9099
+
+proftpd_tls_common_name: proftpd-rnd.example.org
+
+
+nfs_source: 10.100.10.201:/volume-test/proftpd_rnd
+store_base_path: /var/vcap/store/proftpd
+

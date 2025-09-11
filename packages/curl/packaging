@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source meta-info/blobs-versions.env
+
+OPENSSL_PKG="/var/vcap/packages/openssl"
+NGHTTP2_PKG="/var/vcap/packages/nghttp2"
+
+# Pick the correct OpenSSL libdir (lib64 on many builds)
+OPENSSL_LIBDIR="${OPENSSL_PKG}/lib"
+[[ -d "${OPENSSL_PKG}/lib64" ]] && OPENSSL_LIBDIR="${OPENSSL_PKG}/lib64"
+
+# Same idea for nghttp2 (optional)
+NGHTTP2_LIBDIR="${NGHTTP2_PKG}/lib"
+[[ -d "${NGHTTP2_PKG}/lib64" ]] && NGHTTP2_LIBDIR="${NGHTTP2_PKG}/lib64"
+
+tar xzf "devs/curl-${CURL_VERSION}.tar.gz"
+cd "curl-${CURL_VERSION}"
+
+# Headers + libs + RPATH, and make pkg-config see the right .pc files
+export CPPFLAGS="-I${OPENSSL_PKG}/include ${CPPFLAGS:-}"
+export LDFLAGS="-L${OPENSSL_LIBDIR} -Wl,-rpath,${OPENSSL_LIBDIR} ${LDFLAGS:-}"
+export PKG_CONFIG_PATH="${OPENSSL_LIBDIR}/pkgconfig:${PKG_CONFIG_PATH:-}"
+export LIBS="${LIBS:-} -lssl -lcrypto"
+
+CONFIG_FLAGS=(
+  "--prefix=${BOSH_INSTALL_TARGET}"
+  "--with-openssl=${OPENSSL_PKG}"
+  "--enable-unix-sockets"
+  "--without-libpsl"
+  "--without-libidn2"
+  "--without-brotli"
+  "--without-zstd"
+  "--disable-manual"
+  "--disable-docs"
+)
+
+if [[ -d "${NGHTTP2_PKG}" ]]; then
+  export CPPFLAGS="-I${NGHTTP2_PKG}/include ${CPPFLAGS}"
+  export LDFLAGS="-L${NGHTTP2_LIBDIR} -Wl,-rpath,${NGHTTP2_LIBDIR} ${LDFLAGS}"
+  export PKG_CONFIG_PATH="${NGHTTP2_LIBDIR}/pkgconfig:${PKG_CONFIG_PATH}"
+  CONFIG_FLAGS+=("--with-nghttp2=${NGHTTP2_PKG}")
+fi
+
+# Helpful sanity guards before configure
+ls -l "${OPENSSL_LIBDIR}/libssl.so" "${OPENSSL_LIBDIR}/libcrypto.so"
+
+CFLAGS="-fPIC ${CFLAGS:-}" ./configure "${CONFIG_FLAGS[@]}"
+make -j"$(nproc)"
+make install
+
+# Sanity
+"${BOSH_INSTALL_TARGET}/bin/curl-config" --features || true
+ldd "${BOSH_INSTALL_TARGET}/lib/libcurl.so" | egrep 'ssl|crypto|nghttp2'

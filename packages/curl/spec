@@ -1,0 +1,8 @@
+---
+name: curl
+dependencies:
+- openssl
+- nghttp2
+files:
+- meta-info/blobs-versions.env
+- devs/curl-*.tar.gz

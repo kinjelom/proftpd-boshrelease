@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source "/var/vcap/packages/fsaa/bosh-utils/script_utils.sh"
+
+RUN_DIR=<%= File.dirname(p('fsaa.http_server.unix_socket_path')) %>
+LOG_DIR=/var/vcap/sys/log/fsaa
+
+mkdir -p "$RUN_DIR" "$LOG_DIR"
+chown -R root:vcap "$RUN_DIR"
+chmod 0750 "$RUN_DIR" "$LOG_DIR"
+
+HOMES_BASE_DIR="<%= p('fsaa.storage.homes_base_dir') %>"
+CREATE_HOMES_BASE_DIR='<%= p("fsaa.storage.create_homes_base_dir") %>'
+if [ "$CREATE_HOMES_BASE_DIR" == 'true' ]; then
+  mkdir -p "$HOMES_BASE_DIR"
+  chown "<%= p('fsaa.storage.create_homes_base_dir_chown') %>" "$HOMES_BASE_DIR"
+  chmod "<%= p('fsaa.storage.create_homes_base_dir_chmod') %>" "$HOMES_BASE_DIR"
+fi
+
+if wait_for_dir "$HOMES_BASE_DIR" 30; then
+  log_info "[pre-start] Directory '$HOMES_BASE_DIR' is ready"
+else
+  rc=$?
+  if [ "$rc" -eq 3 ]; then
+    log_error "[pre-start] Path '$HOMES_BASE_DIR' exists but is not a directory"
+    exit 3
+  fi
+  log_error "[pre-start] Timeout waiting for directory '$HOMES_BASE_DIR'"
+  exit 1
+fi
+
+# SQLITE DIR CHECK
+SQLITE_DIR=$(dirname "<%= p('fsaa.account_repository.sqlite.db_file_path') %>")
+CREATE_DB_DIR="<%= p('fsaa.account_repository.sqlite.create_db_dir') %>"
+if [ "$CREATE_DB_DIR" == 'true' ]; then
+  mkdir -p "$SQLITE_DIR"
+fi
+
+if [ ! -e "$SQLITE_DIR" ]; then
+  log_error "[pre-start] ERROR: $SQLITE_DIR does not exist"
+  exit 2
+fi
+if [ ! -d "$SQLITE_DIR" ]; then
+  log_error "[pre-start] ERROR: $SQLITE_DIR exists but is not a directory"
+  exit 3
+fi
+
+chown "<%= p('fsaa.account_repository.sqlite.create_db_dir_chown') %>" "$SQLITE_DIR"
+chmod "<%= p('fsaa.account_repository.sqlite.create_db_dir_chmod') %>" "$SQLITE_DIR"
+

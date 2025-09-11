@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source "/var/vcap/packages/fsaa/bosh-utils/script_utils.sh"
+
+function ensure_homes_dir() {
+  local HOMES_BASE_DIR='<%= p('fsaa.storage.homes_base_dir') %>'
+
+  if wait_for_dir "$HOMES_BASE_DIR" 30; then
+    log_info "[ensure_homes_dir] Directory '$HOMES_BASE_DIR' is ready"
+    return 0
+  fi
+
+  rc=$?
+  if [ "$rc" -eq 3 ]; then
+    log_error "[ensure_homes_dir] Path '$HOMES_BASE_DIR' exists but is not a directory"
+    exit 3
+  fi
+
+  log_error "[ensure_homes_dir] Timeout waiting for directory '$HOMES_BASE_DIR'"
+  exit 1
+}
+

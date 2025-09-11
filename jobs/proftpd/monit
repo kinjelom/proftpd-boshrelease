@@ -1,0 +1,6 @@
+# monit 5.2.5 https://gist.github.com/oppegard/46dfa1e40b46aff1fa73c81b10341cab
+check process proftpd
+  with pidfile /var/vcap/sys/run/proftpd/proftpd.pid
+  start program "/var/vcap/jobs/proftpd/bin/ctl.sh start"
+  stop program  "/var/vcap/jobs/proftpd/bin/ctl.sh stop"
+  group vcap

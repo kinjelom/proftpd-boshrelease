@@ -1,0 +1,6 @@
+# monit 5.2.5 https://gist.github.com/oppegard/46dfa1e40b46aff1fa73c81b10341cab
+check process fsaa
+  with pidfile   /var/vcap/sys/run/bpm/fsaa/fsaa.pid
+  start program "/var/vcap/jobs/bpm/bin/bpm start fsaa" with timeout 180 seconds
+  stop program  "/var/vcap/jobs/bpm/bin/bpm stop fsaa" with timeout 180 seconds
+  group vcap

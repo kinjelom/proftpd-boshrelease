@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source meta-info/blobs-versions.env
+
+tar xzf "devs/zlib-${ZLIB_VERSION}.tar.gz"
+cd "zlib-${ZLIB_VERSION}"
+
+# zlib's ./configure builds shared libz.so on Linux by default
+CFLAGS="-fPIC ${CFLAGS:-}" ./configure --prefix="${BOSH_INSTALL_TARGET}"
+make -j"$(nproc)"
+make install
+
+# Sanity
+ls -l "${BOSH_INSTALL_TARGET}/lib/libz."* || true

@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source meta-info/blobs-versions.env # PROFTPD_VERSION
+
+# Available variables
+# $BOSH_COMPILE_TARGET - where this package & spec'd source files are available
+# $BOSH_INSTALL_TARGET - where you copy/install files to be included in package
+
+mkdir -p "${BOSH_INSTALL_TARGET}/bosh-utils"
+cp -a "${BOSH_COMPILE_TARGET}/bosh-utils/"* "${BOSH_INSTALL_TARGET}/bosh-utils"
+
+MARIADB_CC_PKG="/var/vcap/packages/mariadb-connector-c"
+SQLITE_PKG="/var/vcap/packages/sqlite"
+LIBMICROHTTPD_PKG="/var/vcap/packages/libmicrohttpd"
+ZLIB_PKG="/var/vcap/packages/zlib"
+CURL_PKG="/var/vcap/packages/curl"
+OPENSSL_PKG="/var/vcap/packages/openssl"
+NGHTTP2_PKG="/var/vcap/packages/nghttp2"
+
+for d in "$MARIADB_CC_PKG" "$SQLITE_PKG" "$LIBMICROHTTPD_PKG" "$ZLIB_PKG" "$CURL_PKG" "$OPENSSL_PKG" "$NGHTTP2_PKG"; do
+  [[ -d "$d" ]] || { echo "Missing package dir: $d"; exit 1; }
+done
+
+export PATH="${MARIADB_CC_PKG}/bin:${PATH}"
+
+# Compile-time includes
+export CPPFLAGS="-I${CURL_PKG}/include ${CPPFLAGS:-} \
+  -I${SQLITE_PKG}/include -I${LIBMICROHTTPD_PKG}/include -I${ZLIB_PKG}/include \
+  -I${NGHTTP2_PKG}/include -I${OPENSSL_PKG}/include -I${MARIADB_CC_PKG}/include -I${MARIADB_CC_PKG}/include/mariadb"
+
+
+WITH_INCLUDES="${SQLITE_PKG}/include:${LIBMICROHTTPD_PKG}/include:${ZLIB_PKG}/include:${CURL_PKG}/include:${NGHTTP2_PKG}/include:${OPENSSL_PKG}/include:${MARIADB_CC_PKG}/include:${MARIADB_CC_PKG}/include/mariadb"
+
+# Link-time search paths + RPATHs (so runtime finds .so without env vars)
+export LDFLAGS="${LDFLAGS:-} \
+  -L${SQLITE_PKG}/lib        -Wl,-rpath,${SQLITE_PKG}/lib \
+  -L${LIBMICROHTTPD_PKG}/lib -Wl,-rpath,${LIBMICROHTTPD_PKG}/lib \
+  -L${ZLIB_PKG}/lib          -Wl,-rpath,${ZLIB_PKG}/lib \
+  -L${CURL_PKG}/lib          -Wl,-rpath,${CURL_PKG}/lib \
+  -L${NGHTTP2_PKG}/lib       -Wl,-rpath,${NGHTTP2_PKG}/lib \
+  -L${OPENSSL_PKG}/lib       -Wl,-rpath,${OPENSSL_PKG}/lib \
+  -L${MARIADB_CC_PKG}/lib/mariadb -Wl,-rpath,${MARIADB_CC_PKG}/lib/mariadb"
+
+SQLITE_LIBDIR="${SQLITE_PKG}/lib"; [[ -d "${SQLITE_PKG}/lib64" ]] && SQLITE_LIBDIR="${SQLITE_PKG}/lib64"
+LIBMICROHTTPD_LIBDIR="${LIBMICROHTTPD_PKG}/lib"; [[ -d "${LIBMICROHTTPD_PKG}/lib64" ]] && LIBMICROHTTPD_LIBDIR="${LIBMICROHTTPD_PKG}/lib64"
+ZLIB_LIBDIR="${ZLIB_PKG}/lib"; [[ -d "${ZLIB_PKG}/lib64" ]] && ZLIB_LIBDIR="${ZLIB_PKG}/lib64"
+CURL_LIBDIR="${CURL_PKG}/lib"; [[ -d "${CURL_PKG}/lib64" ]] && CURL_LIBDIR="${CURL_PKG}/lib64"
+NGHTTP2_LIBDIR="${NGHTTP2_PKG}/lib"; [[ -d "${NGHTTP2_PKG}/lib64" ]] && NGHTTP2_LIBDIR="${NGHTTP2_PKG}/lib64"
+OPENSSL_LIBDIR="${OPENSSL_PKG}/lib"; [[ -d "${OPENSSL_PKG}/lib64" ]] && OPENSSL_LIBDIR="${OPENSSL_PKG}/lib64"
+
+WITH_LIBS="${SQLITE_LIBDIR}:${LIBMICROHTTPD_LIBDIR}:${ZLIB_LIBDIR}:${CURL_LIBDIR}:${NGHTTP2_LIBDIR}:${OPENSSL_LIBDIR}:${MARIADB_CC_PKG}/lib/mariadb"
+
+# Libraries (order matters; keep -lcurl last-ish, OpenSSL pulled by mod_tls anyway)
+export LIBS="${LIBS:-} -lsqlite3 -lmicrohttpd -lz -lcurl"
+
+export MARIADB_CONFIG="${MARIADB_CC_PKG}/bin/mariadb_config"
+
+# --- MariaDB/MySQL compatibility shims ---
+[ -e "${MARIADB_CC_PKG}/include/mysql" ] || ln -s mariadb "${MARIADB_CC_PKG}/include/mysql"
+[ -e "${MARIADB_CC_PKG}/lib/libmysqlclient.so" ] || ln -s mariadb/libmariadb.so "${MARIADB_CC_PKG}/lib/libmysqlclient.so"
+[ -e "${MARIADB_CC_PKG}/lib/mariadb/libmysqlclient.so" ] || ln -s libmariadb.so "${MARIADB_CC_PKG}/lib/mariadb/libmysqlclient.so"
+
+tar xzf "proftpd/proftpd-${PROFTPD_VERSION}.tar.gz"
+cd "proftpd-${PROFTPD_VERSION}"
+
+# ---- Inject mod_prometheus sources into contrib/ ----
+mkdir -p contrib/mod_prometheus
+# ZIP path provided by package: proftpd/mod_prometheus-<VERSION>.src.zip
+unzip -q "${BOSH_COMPILE_TARGET}/proftpd/mod_prometheus-${MOD_PROMETHEUS_VERSION}.src.zip" -d "${BOSH_COMPILE_TARGET}/proftpd"
+MOD_PROM_SRC_DIR="${BOSH_COMPILE_TARGET}/proftpd/proftpd-mod_prometheus-${MOD_PROMETHEUS_VERSION}"
+test -n "${MOD_PROM_SRC_DIR}" || { echo "mod_prometheus sources not found"; exit 1; }
+
+# Copy into contrib/mod_prometheus
+cp -a "${MOD_PROM_SRC_DIR}/." contrib/mod_prometheus/
+
+
+# ---- Inject mod_auth_rest sources into contrib/ ----
+mkdir -p contrib/mod_auth_rest
+# ZIP path provided by package: proftpd/mod_auth_rest-<VERSION>.src.zip
+unzip -q "${BOSH_COMPILE_TARGET}/proftpd/mod_auth_rest-${MOD_AUTH_REST_VERSION}.src.zip" -d "${BOSH_COMPILE_TARGET}/proftpd"
+MOD_AUTH_REST_SRC_DIR="${BOSH_COMPILE_TARGET}/proftpd/proftpd_mod_auth_rest-${MOD_AUTH_REST_VERSION}"
+test -n "${MOD_AUTH_REST_SRC_DIR}" || { echo "mod_auth_rest sources not found"; exit 1; }
+
+# Copy into contrib/mod_auth_rest
+cp -a "${MOD_AUTH_REST_SRC_DIR}/." contrib/mod_auth_rest/
+
+
+echo "--- configure proftpd ---" >&2
+# Configure: DSO + modules, including mod_prometheus and mod_auth_rest
+./configure \
+  --prefix="${BOSH_INSTALL_TARGET}" \
+  --enable-dso \
+  --enable-ctrls \
+  --enable-openssl \
+  --enable-nls \
+  --enable-curses \
+  --with-includes="${WITH_INCLUDES}" \
+  --with-libraries="${WITH_LIBS}" \
+  --with-shared=mod_ctrls_admin:mod_prometheus:mod_auth_rest:mod_tls:mod_sftp:mod_sql:mod_sql_mysql:mod_wrap2:mod_wrap2_file \
+  --with-mysql-config="${MARIADB_CONFIG}"
+
+echo "--- make proftpd ---" >&2
+make -j"$(nproc)"
+make install
+
+# Sanity
+echo "--- sanity tests ---" >&2
+"${BOSH_INSTALL_TARGET}/sbin/proftpd" -v || true
+"${BOSH_INSTALL_TARGET}/sbin/proftpd" -l || true
+if ! ls "${BOSH_INSTALL_TARGET}/libexec"/mod_prometheus.* >/dev/null 2>&1; then
+ echo "mod_prometheus not built"; exit 1
+fi
+if ! ls "${BOSH_INSTALL_TARGET}/libexec"/mod_auth_rest.* >/dev/null 2>&1; then
+ echo "mod_auth_rest not built"; exit 1
+fi
+
+#ldd "${BOSH_INSTALL_TARGET}/libexec/mod_tls.so"       | egrep 'ssl|crypto'
+#ldd "${BOSH_INSTALL_TARGET}/libexec/mod_auth_rest.so" | egrep 'curl|ssl|crypto|nghttp2|microhttpd'
+#"${BOSH_INSTALL_TARGET}/sbin/proftpd" -l | egrep 'mod_(auth_rest|prometheus|tls|sftp|sql)'

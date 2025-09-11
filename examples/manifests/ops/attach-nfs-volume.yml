@@ -1,0 +1,38 @@
+---
+- type: replace
+  path: /releases/name=boost?
+  value:
+    name: boost
+    version: latest
+
+- type: replace
+  path: /instance_groups/name=proftpd/jobs/name=nfs_mounter?
+  value:
+    name: nfs_mounter
+    release: boost
+    tags:
+      prometheus_exporter_port: ((nfsma_port))
+    properties:
+      nfs_mounter:
+        agent:
+          listen_port: ((nfsma_port))
+        nfs_source: ((nfs_source))
+        mount_point: ((store_base_path))
+        mount_point_chown: "root:vcap"
+        mount_point_chmod: "0755"
+        ensure_dirs_when_mounted:
+          - subpath: "homes"
+            chmod: "0751"
+            chown: "root:vcap"
+          - subpath: "db"
+            chmod: "0751"
+            chown: "root:vcap"
+
+
+- type: replace
+  path: /instance_groups/name=proftpd/jobs/name=proftpd/properties?/proftpd?/storage?/create_homes_base_dir?
+  value: false
+
+- type: replace
+  path: /instance_groups/name=proftpd/jobs/name=fsaa/properties?/fsaa?/account_repository?/sqlite?/create_db_dir?
+  value: false

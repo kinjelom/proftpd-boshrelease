@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source meta-info/blobs-versions.env
+
+tar xzf "devs/sqlite-autoconf-${SQLITE_VERSION}.tar.gz"
+cd "sqlite-autoconf-${SQLITE_VERSION}"
+
+# Build shared library only (no static), PIC just in case
+CFLAGS="-fPIC ${CFLAGS:-}" \
+./configure \
+  --prefix="${BOSH_INSTALL_TARGET}" \
+  --enable-shared \
+  --disable-static
+
+make -j"$(nproc)"
+make install
+
+# Sanity
+ls -l "${BOSH_INSTALL_TARGET}/lib/"libsqlite3.* || true
+pkg-config --exists sqlite3 2>/dev/null || true

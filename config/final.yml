@@ -1,0 +1,6 @@
+name: proftpd
+blobstore:
+  provider: s3
+  options:
+    folder_name: proftpd
+    bucket_name: boshreleases

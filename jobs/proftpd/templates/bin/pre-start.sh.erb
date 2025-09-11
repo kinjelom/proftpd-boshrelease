@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+JOB_DIR=/var/vcap/jobs/proftpd
+RUN_DIR=/var/vcap/sys/run/proftpd
+LOG_DIR=/var/vcap/sys/log/proftpd
+DATA_DIR=/var/vcap/data/proftpd
+PKG_DIR=/var/vcap/packages/proftpd
+
+source "$PKG_DIR/bosh-utils/script_utils.sh"
+
+mkdir -p "$DATA_DIR/config" "$DATA_DIR/mod_prometheus" "$RUN_DIR" "$LOG_DIR"
+chown -R vcap:vcap "$DATA_DIR" "$RUN_DIR" "$LOG_DIR"
+chmod 0750 "$DATA_DIR" "$DATA_DIR/config" "$DATA_DIR/mod_prometheus" "$RUN_DIR" "$LOG_DIR"
+
+# HOMES CHECK
+HOMES_BASE_DIR='<%= p("proftpd.storage.homes_base_dir") %>'
+CREATE_HOMES_BASE_DIR='<%= p("proftpd.storage.create_homes_base_dir") %>'
+if [ "$CREATE_HOMES_BASE_DIR" == 'true' ]; then
+  mkdir -p "$HOMES_BASE_DIR"
+  chown "<%= p('proftpd.storage.create_homes_base_dir_chown') %>" "$HOMES_BASE_DIR"
+  chmod "<%= p('proftpd.storage.create_homes_base_dir_chmod') %>" "$HOMES_BASE_DIR"
+fi
+
+if wait_for_dir "$HOMES_BASE_DIR" 30; then
+  log_info "[pre-start] Directory '$HOMES_BASE_DIR' is ready"
+else
+  rc=$?
+  if [ "$rc" -eq 3 ]; then
+    log_error "[pre-start] Path '$HOMES_BASE_DIR' exists but is not a directory"
+    exit 3
+  fi
+  log_error "[pre-start] Timeout waiting for directory '$HOMES_BASE_DIR'"
+  exit 1
+fi
+
+# Ensure tight perms on directory and key
+SFTP_DIR="/var/vcap/jobs/proftpd/config/mod_sftp"
+chmod 0700 "$SFTP_DIR"
+chmod 0600 "${SFTP_DIR}/ssh_host_rsa_key"
+
+
+# Validate config after filesystem/layout is ready
+source "$JOB_DIR/bin/functions.sh"
+LD_LIBRARY_PATH="$(get_ld_library_path)"
+export LD_LIBRARY_PATH
+
+CONF_FILE="$JOB_DIR/config/proftpd.conf"
+VALIDATION_LOG="$LOG_DIR/pre-start.config-validation.latest.log"
+
+echo "--- ProFTPD config validation $(date) ---" >"$VALIDATION_LOG"
+if ! "$PKG_DIR/sbin/proftpd" -t -c "$CONF_FILE" >>"$VALIDATION_LOG" 2>&1; then
+  log_error "[pre-start] ERROR: ProFTPD config is invalid, aborting."
+  exit 1
+else
+  log_info "[pre-start] SUCCESS: ProFTPD config is valid" >>"$LOG_DIR/pre-start.stdout.log"
+fi

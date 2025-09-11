@@ -1,0 +1,162 @@
+---
+name: fsaa
+
+packages:
+  - fsaa
+
+templates:
+  config/bpm.yml.erb: config/bpm.yml
+  config/fsaa.yml.erb: config/fsaa.yml
+  config/mysql_ca.crt.erb: config/mysql_ca.crt
+  bin/pre-start.sh.erb: bin/pre-start
+
+properties:
+  fsaa.http_server.listen_address:
+    description: "Address and port where the HTTP server listens."
+    default: "0.0.0.0:9090"
+
+  fsaa.http_server.unix_socket_path:
+    description: "Filesystem path for the HTTP Unix domain socket."
+    default: "/var/vcap/sys/run/fsaa/fsaa.sock"
+
+  fsaa.http_server.telemetry_path:
+    description: "HTTP path for Prometheus metrics exposition."
+    default: "/metrics"
+
+  fsaa.http_server.banner:
+    description: "Optional banner logged on startup and exposed in responses."
+    default: ""
+
+  fsaa.metrics.namespace:
+    description: "Prometheus metric namespace prefix."
+    default: "fsaa"
+
+  fsaa.metrics.environment:
+    description: "Environment label added to all metrics (e.g., dev/stage/prod)."
+    default: "dev"
+
+  fsaa.security.authenticator.access_keys:
+    description: >
+      Map of access keys for HMAC/Bearer authenticators. Keys are identifiers,
+      values are shared secrets (string). Example:
+      { "key-1": "supersecret1", "key-2": "supersecret2" }.
+    default: {}
+
+  fsaa.storage.homes_base_dir:
+    description: "Root directory for managed home paths."
+    default: "/var/vcap/store/fsaa/homes"
+
+  fsaa.storage.create_homes_base_dir:
+    description: "Whether to automatically create the homes base directory if it doesn't exist."
+    default: false
+
+  fsaa.storage.create_homes_base_dir_chown:
+    description: "Chown the dir to this user:group"
+    default: "root:vcap"
+
+  fsaa.storage.create_homes_base_dir_chmod:
+    description: "Chmod the dir to this value"
+    default: "0755"
+
+  fsaa.storage.default_user_top_dirs:
+    description: "List of default top-level directories to create in each user's home directory."
+    default: [ _test ]
+
+  fsaa.account_repository.common.min_uid:
+    description: "Minimum UID to allocate for new users."
+    default: 2000
+
+  fsaa.account_repository.common.min_gid:
+    description: "Minimum GID to allocate for new groups."
+    default: 2000
+
+  fsaa.account_repository.type:
+    description: "Account repository backend type: sqlite, mysql or inmem."
+    default: "sqlite"
+
+  fsaa.account_repository.sqlite.db_file_path:
+    description: "SQLite database file path (used when type=sqlite)."
+    default: "/var/vcap/store/fsaa/db/fs-access-api.db"
+
+  fsaa.account_repository.sqlite.create_db_dir:
+    description: "Whether to automatically create the SQLite database directory if it doesn't exist."
+    default: false
+
+  fsaa.account_repository.sqlite.create_db_dir_chown:
+    description: "Chown the dir to this user:group"
+    default: "root:vcap"
+
+  fsaa.account_repository.sqlite.create_db_dir_chmod:
+    description: "Chmod the dir to this user:group"
+    default: "0751"
+
+  fsaa.account_repository.mysql.host:
+    description: "MySQL host (used when type=mysql)."
+    default: "127.0.0.1"
+
+  fsaa.account_repository.mysql.port:
+    description: "MySQL port (used when type=mysql)."
+    default: 3306
+
+  fsaa.account_repository.mysql.user:
+    description: "MySQL user (used when type=mysql)."
+    default: "fsaa"
+
+  fsaa.account_repository.mysql.password:
+    description: "MySQL password (used when type=mysql). Keep secret in deployment vars."
+    default: ""
+
+  fsaa.account_repository.mysql.database:
+    description: "MySQL database name (used when type=mysql)."
+    default: "fsaa"
+
+  fsaa.account_repository.mysql.ca_cert:
+    description: "MySQL CA certificate for TLS/SSL connection verification (PEM format)."
+    default: ""
+
+  fsaa.account_repository.mysql.ignore_ssl:
+    description: "Whether to disable SSL/TLS certificate verification for MySQL connections."
+    default: "true"
+
+  fsaa.account_repository.inmem.entities_limit:
+    description: "In-memory entities limit."
+    default: 1000
+
+  fsaa.account_repository.load_initial_data:
+    description: "Whether to load initial groups and users from initial_data property on startup."
+    default: "false"
+
+  fsaa.account_repository.initial_data:
+    description: "Initial data structure containing predefined groups and users to be loaded on startup."
+    default:
+      groups: {}
+      users: {}
+    example:
+      groups:
+        demo:
+          home: demo
+          gid: 2044
+          description: "demo group"
+      users:
+        demo-operator:
+          password: "2887fef1e2994762429224231be03ddd6a4abd6f2b31559a4d758faa5c271b73" # demo-pa55w0rd
+          password_is_hash: true
+          groupname: demo
+          description: "demo operator"
+          home: .
+        demo-user-a:
+          password: "2887fef1e2994762429224231be03ddd6a4abd6f2b31559a4d758faa5c271b73"
+          password_is_hash: true
+          groupname: demo
+          description: "demo user a"
+          home: user-a
+        demo-user-b:
+          password: "2887fef1e2994762429224231be03ddd6a4abd6f2b31559a4d758faa5c271b73"
+          password_is_hash: true
+          groupname: demo
+          description: "demo user b"
+          home: user-b
+
+  fsaa.env:
+    description: "Environment variables map to be passed to the fsaa process."
+    default: {}

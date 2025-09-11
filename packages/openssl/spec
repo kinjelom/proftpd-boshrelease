@@ -1,0 +1,6 @@
+---
+name: openssl
+dependencies: []
+files:
+- meta-info/blobs-versions.env
+- devs/openssl-*.tar.gz

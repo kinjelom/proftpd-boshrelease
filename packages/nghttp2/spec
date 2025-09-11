@@ -1,0 +1,6 @@
+---
+name: nghttp2
+dependencies: []
+files:
+- meta-info/blobs-versions.env
+- devs/nghttp2-*.tar.gz

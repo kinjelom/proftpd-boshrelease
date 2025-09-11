@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source meta-info/blobs-versions.env
+
+tar xzf "devs/nghttp2-${NGHTTP2_VERSION}.tar.gz"
+cd "nghttp2-${NGHTTP2_VERSION}"
+./configure --prefix="${BOSH_INSTALL_TARGET}" --disable-python-bindings
+make -j"$(nproc)"
+make install
+
+# Sanity
+ls -l "${BOSH_INSTALL_TARGET}/lib/nghttp2."* || true

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source meta-info/blobs-versions.env
+
+tar xzf "devs/libmicrohttpd-${LIBMICROHTTPD_VERSION}.tar.gz"
+cd "libmicrohttpd-${LIBMICROHTTPD_VERSION}"
+
+# Build only HTTP (no HTTPS) to avoid pulling in GnuTLS in the compile VM.
+# Prometheus metrics endpoint doesn't need TLS; terminate via front proxy if required.
+CFLAGS="-fPIC ${CFLAGS:-}" \
+./configure \
+  --prefix="${BOSH_INSTALL_TARGET}" \
+  --disable-static \
+  --enable-shared \
+  --disable-doc \
+  --disable-https \
+  --without-gnutls
+
+make -j"$(nproc)"
+make install
+
+# Sanity
+ls -l "${BOSH_INSTALL_TARGET}/lib/"libmicrohttpd.* || true
+pkg-config --exists libmicrohttpd 2>/dev/null || true

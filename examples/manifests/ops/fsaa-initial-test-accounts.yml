@@ -1,0 +1,48 @@
+---
+- type: replace
+  path: /instance_groups/name=proftpd/jobs/name=fsaa/properties?/fsaa?/account_repository?/load_initial_data?
+  value: true
+
+- type: replace
+  path: /instance_groups/name=proftpd/jobs/name=fsaa/properties?/fsaa?/account_repository?/initial_data?
+  value:
+      groups:
+        test:
+          home: test
+          gid: 2013
+          description: "test group"
+        test-other:
+          home: test-other
+          gid: 2014
+          description: "test other group"
+      users:
+        test-operator:
+          password: "56965e2a1a995c74da500088947af11dfa27951cc350d0b97d0633075969c31b" # pa55w0rd
+          password_is_hash: true
+          groupname: test
+          description: "test operator"
+          home: .
+        test-user-a:
+          password: "56965e2a1a995c74da500088947af11dfa27951cc350d0b97d0633075969c31b"
+          password_is_hash: true
+          groupname: test
+          description: "test user a"
+          home: user-a
+        test-user-b1:
+          password: "56965e2a1a995c74da500088947af11dfa27951cc350d0b97d0633075969c31b"
+          password_is_hash: true
+          groupname: test
+          description: "test user b1"
+          home: user-b
+        test-user-b2:
+          password: "56965e2a1a995c74da500088947af11dfa27951cc350d0b97d0633075969c31b"
+          password_is_hash: true
+          groupname: test
+          description: "test user b2"
+          home: user-b
+        test-other-operator:
+          password: "56965e2a1a995c74da500088947af11dfa27951cc350d0b97d0633075969c31b" # pa55w0rd
+          password_is_hash: true
+          groupname: test-other
+          description: "test other operator"
+          home: .

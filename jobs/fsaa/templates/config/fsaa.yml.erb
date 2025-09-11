@@ -1,0 +1,53 @@
+http_server:
+  listen_address: <%= p('fsaa.http_server.listen_address') %>
+  unix_socket_path: <%= p('fsaa.http_server.unix_socket_path') %>
+  telemetry_path: <%= p('fsaa.http_server.telemetry_path') %>
+  banner: <%= p('fsaa.http_server.banner') %>
+metrics:
+  namespace: <%= p('fsaa.metrics.namespace') %>
+  environment: <%= p('fsaa.metrics.environment') %>
+security:
+  authenticator:
+    enabled_authenticators: [hmac, bearer]
+    window_seconds: 60
+    access_keys:
+    <%- p("fsaa.security.authenticator.access_keys", {}).each do |key, val| -%>
+      <%= key %>: <%= val %>
+    <%- end -%>
+  hasher:
+    default_algorithm: "crypt-sha256"
+    default_rounds: 5000
+    default_salt_len: 16
+storage:
+  implementation: "unix"
+  homes_base_dir: <%= p('fsaa.storage.homes_base_dir') %>
+  create_homes_base_dir: <%= p('fsaa.storage.create_homes_base_dir') %>
+  default_user_top_dirs:
+  <%- p('fsaa.storage.default_user_top_dirs', []).each do |val| -%>
+    - <%= val %>
+  <%- end -%>
+account_repository:
+  common:
+    min_uid: <%= p('fsaa.account_repository.common.min_uid') %>
+    min_gid: <%= p('fsaa.account_repository.common.min_gid') %>
+  type: <%= p('fsaa.account_repository.type') %>
+  sqlite:
+    db_file_path: <%= p('fsaa.account_repository.sqlite.db_file_path') %>
+    create_db_dir: <%= p('fsaa.account_repository.sqlite.create_db_dir') %>
+    query_timeout: 5s
+    write_timeout: 5s
+  mysql:
+    host: <%= p('fsaa.account_repository.mysql.host') %>
+    port: <%= p('fsaa.account_repository.mysql.port') %>
+    user: <%= p('fsaa.account_repository.mysql.user') %>
+    password: <%= p('fsaa.account_repository.mysql.password') %>
+    database: <%= p('fsaa.account_repository.mysql.database') %>
+    ignore_ssl: <%= p('fsaa.account_repository.mysql.ignore_ssl') %>
+    ssl_ca_path: "/var/vcap/jobs/fsaa/config/mysql_ca.crt"
+    query_timeout: 5s
+    write_timeout: 5s
+  inmem:
+    entities_limit: <%= p('fsaa.account_repository.inmem.entities_limit') %>
+  load_initial_data: <%= p('fsaa.account_repository.load_initial_data') %>
+  initial_data:
+<%= p('fsaa.account_repository.initial_data', {'groups' => {}, 'users' => {}}).to_yaml.gsub(/\A---\s*\n/, '').gsub(/^/, '    ') %>

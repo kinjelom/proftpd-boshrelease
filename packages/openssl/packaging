@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source meta-info/blobs-versions.env
+
+tar xzf "devs/openssl-${OPENSSL_VERSION}.tar.gz"
+cd "openssl-${OPENSSL_VERSION}"
+
+./Configure linux-x86_64 \
+  --prefix="${BOSH_INSTALL_TARGET}" \
+  shared enable-ec enable-tls1_3 no-tests \
+  -fPIC
+
+make -j"$(nproc)"
+make install_sw
+
+# sanity
+ls -l "${BOSH_INSTALL_TARGET}/lib/openssl."* || true
+objdump -T "${BOSH_INSTALL_TARGET}/lib/libssl.so" | grep SSL_get0_group_name || echo "MISSING"

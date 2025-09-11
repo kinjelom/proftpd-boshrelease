@@ -1,0 +1,7 @@
+---
+name: fsaa
+
+files:
+  - meta-info/blobs-versions.env
+  - fsaa/*.tar.gz
+  - bosh-utils/*
