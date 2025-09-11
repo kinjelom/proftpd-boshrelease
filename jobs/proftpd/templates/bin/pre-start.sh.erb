@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+JOB_DIR=/var/vcap/jobs/proftpd
+RUN_DIR=/var/vcap/sys/run/proftpd
+LOG_DIR=/var/vcap/sys/log/proftpd
+DATA_DIR=/var/vcap/data/proftpd
+PKG_DIR=/var/vcap/packages/proftpd
+
+
+mkdir -p "$DATA_DIR/config" "$DATA_DIR/mod_prometheus" "$RUN_DIR" "$LOG_DIR"
+chown -R vcap:vcap "$DATA_DIR" "$RUN_DIR" "$LOG_DIR"
+chmod 0750 "$DATA_DIR" "$DATA_DIR/config" "$DATA_DIR/mod_prometheus" "$RUN_DIR" "$LOG_DIR"
+
+HOMES_BASE_DIR='<%= p("proftpd.storage.homes_base_dir") %>'
+mkdir -p "$HOMES_BASE_DIR"
+chown root:root "$HOMES_BASE_DIR"
+chmod 0711 "$HOMES_BASE_DIR"
+
+source "$PKG_DIR/bosh-utils/script_utils.sh"
+
+# Ensure tight perms on directory and key
+SFTP_DIR="/var/vcap/jobs/proftpd/config/mod_sftp"
+chmod 0700 "$SFTP_DIR"
+chmod 0600 "${SFTP_DIR}/ssh_host_rsa_key"
+
+# Validate config after filesystem/layout is ready
+ALL_PKG_DIR="/var/vcap/packages"
+CONF_FILE="$JOB_DIR/config/proftpd.conf"
+export LD_LIBRARY_PATH="${ALL_PKG_DIR}/proftpd/lib:${ALL_PKG_DIR}/lib/mariadb:${ALL_PKG_DIR}/sqlite/lib:${ALL_PKG_DIR}/libmicrohttpd/lib:${ALL_PKG_DIR}/zlib/lib:${LD_LIBRARY_PATH:-}"
+VALIDATION_LOG="$LOG_DIR/pre-start.config-validation.latest.log"
+
+echo "--- ProFTPD config validation $(date) ---" >"$VALIDATION_LOG"
+if ! "$ALL_PKG_DIR/proftpd/sbin/proftpd" -t -c "$CONF_FILE" >>"$VALIDATION_LOG" 2>&1; then
+  log_error "[pre-start] ERROR: ProFTPD config is invalid, aborting."
+  exit 1
+else
+  log_info "[pre-start] SUCCESS: ProFTPD config is valid" >>"$LOG_DIR/pre-start.stdout.log"
+fi

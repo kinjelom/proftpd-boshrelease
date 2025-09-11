@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+umask 027
+
+JOB_DIR=/var/vcap/jobs/proftpd
+DATA_DIR=/var/vcap/data/proftpd
+STORE_DIR=/var/vcap/store/proftpd
+HOMES_DIR="$STORE_DIR/data/homes"
+
+PASSWD_SRC_FILE="$JOB_DIR/config/local_auth.users.to-fill"
+PASSWD_DEST_FILE="$DATA_DIR/config/local_auth.users"
+
+FTPASSWD="/var/vcap/packages/proftpd/bin/ftpasswd"
+
+# Ensure directories exist
+mkdir -p "$(dirname "$PASSWD_DEST_FILE")" "$HOMES_DIR"
+
+# Ensure source file exists (admin fills it with "name:pass:uid:gid:gecos:home:shell")
+[ -f "$PASSWD_SRC_FILE" ] || : > "$PASSWD_SRC_FILE"
+chmod 0640 "$PASSWD_SRC_FILE" || true
+
+# Create temporary destination file; remove on error
+TMP_DEST="$(mktemp "${PASSWD_DEST_FILE}.XXXXXX")"
+trap 'rm -f "$TMP_DEST"' EXIT
+: > "$TMP_DEST"
+chmod 0640 "$TMP_DEST"
+
+DEFAULT_UID=1000
+DEFAULT_GID=1000
+
+# Read colon-separated fields: name:pass:uid:gid:gecos:home:shell
+while IFS=: read -r name pass uid gid gecos home shell; do
+  # Skip empty lines and comments
+  [ -n "${name:-}" ] || continue
+  case "$name" in \#*) continue ;; esac
+
+  uid="${uid:-$DEFAULT_UID}"
+  gid="${gid:-$DEFAULT_GID}"
+  shell="${shell:-/bin/false}"
+  gecos="${gecos:-}"
+
+  # Default home under HOMES_DIR if not provided
+  home="${home:-$HOMES_DIR/$name}"
+
+  # Ensure user's home exists with proper perms
+  mkdir -p "$home"
+  chown -R vcap:vcap "$home"
+  chmod 0750 "$home"
+
+  # If password already hashed ($1,$5,$6), write raw line.
+  if [[ "${pass:-}" =~ ^\$(1|5|6)\$ ]]; then
+    printf '%s:%s:%s:%s:%s:%s:%s\n' \
+      "$name" "$pass" "$uid" "$gid" "$gecos" "$home" "$shell" >> "$TMP_DEST"
+    continue
+  fi
+
+  # If password empty, still create account with empty password (discouraged).
+  # You can 'continue' instead to skip such entries.
+  "${FTPASSWD}" --passwd --sha512 --file="$TMP_DEST" \
+      --name="$name" --uid="$uid" --gid="$gid" \
+      --home="$home" --shell="$shell" --stdin >/dev/null <<EOF
+${pass:-}
+EOF
+
+done < "$PASSWD_SRC_FILE"
+
+# Atomic replace; readable by group vcap (proftpd runs as vcap)
+mv -f "$TMP_DEST" "$PASSWD_DEST_FILE"
+trap - EXIT
+
+chown root:vcap "$PASSWD_DEST_FILE"
+chmod 0640 "$PASSWD_DEST_FILE"

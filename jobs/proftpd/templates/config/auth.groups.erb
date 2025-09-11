@@ -1,0 +1,8 @@
+<%-
+  groups = p("proftpd.mod_auth_file.groups", []) || []
+-%>
+<%# @formatter:off -%>
+<%- groups.each do |g| -%>
+<%= g["groupname"] %>:*:<%= g["gid"] %>:<%= g["members"] %>
+<%- end -%>
+<%# @formatter:on -%>

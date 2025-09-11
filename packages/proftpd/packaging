@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source meta-info/blobs-versions.env # PROFTPD_VERSION
+
+# Available variables
+# $BOSH_COMPILE_TARGET - where this package & spec'd source files are available
+# $BOSH_INSTALL_TARGET - where you copy/install files to be included in package
+
+mkdir -p "${BOSH_INSTALL_TARGET}/bosh-utils"
+cp -a "${BOSH_COMPILE_TARGET}/bosh-utils/"* "${BOSH_INSTALL_TARGET}/bosh-utils"
+
+MARIADB_CC_PKG="/var/vcap/packages/mariadb-connector-c"
+SQLITE_PKG="/var/vcap/packages/sqlite"
+LIBMICROHTTPD_PKG="/var/vcap/packages/libmicrohttpd"
+ZLIB_PKG="/var/vcap/packages/zlib"
+
+for d in "$MARIADB_CC_PKG" "$SQLITE_PKG" "$LIBMICROHTTPD_PKG" "$ZLIB_PKG"; do
+  [[ -d "$d" ]] || { echo "Missing package dir: $d"; exit 1; }
+done
+
+export PATH="${MARIADB_CC_PKG}/bin:${PATH}"
+export CPPFLAGS="-I${SQLITE_PKG}/include -I${LIBMICROHTTPD_PKG}/include -I${ZLIB_PKG}/include -I${MARIADB_CC_PKG}/include -I${MARIADB_CC_PKG}/include/mariadb ${CPPFLAGS:-}"
+export LDFLAGS="-L${SQLITE_PKG}/lib -L${LIBMICROHTTPD_PKG}/lib -L${ZLIB_PKG}/lib -L${MARIADB_CC_PKG}/lib/mariadb -Wl,-rpath,${MARIADB_CC_PKG}/lib/mariadb ${LDFLAGS:-}"
+export LIBS="-lsqlite3 -lmicrohttpd -lz ${LIBS:-}"
+export MARIADB_CONFIG="${MARIADB_CC_PKG}/bin/mariadb_config"
+
+# --- MariaDB/MySQL compatibility shims ---
+[ -e "${MARIADB_CC_PKG}/include/mysql" ] || ln -s mariadb "${MARIADB_CC_PKG}/include/mysql"
+[ -e "${MARIADB_CC_PKG}/lib/libmysqlclient.so" ] || ln -s mariadb/libmariadb.so "${MARIADB_CC_PKG}/lib/libmysqlclient.so"
+[ -e "${MARIADB_CC_PKG}/lib/mariadb/libmysqlclient.so" ] || ln -s libmariadb.so "${MARIADB_CC_PKG}/lib/mariadb/libmysqlclient.so"
+
+tar xzf "proftpd/proftpd-${PROFTPD_VERSION}.tar.gz"
+cd "proftpd-${PROFTPD_VERSION}"
+
+# ---- Inject mod_prometheus sources into contrib/ ----
+mkdir -p contrib/mod_prometheus
+# ZIP path provided by package: proftpd/mod_prometheus-<VERSION>.src.zip
+unzip -q "${BOSH_COMPILE_TARGET}/proftpd/mod_prometheus-${MOD_PROMETHEUS_VERSION}.src.zip" -d "${BOSH_COMPILE_TARGET}/proftpd"
+MOD_PROM_SRC_DIR="${BOSH_COMPILE_TARGET}/proftpd/proftpd-mod_prometheus-${MOD_PROMETHEUS_VERSION}"
+test -n "${MOD_PROM_SRC_DIR}" || { echo "mod_prometheus sources not found"; exit 1; }
+
+# Copy into contrib/mod_prometheus
+mkdir -p contrib/mod_prometheus
+cp -a "${MOD_PROM_SRC_DIR}/." contrib/mod_prometheus/
+
+# Configure: DSO + modules, including mod_prometheus
+./configure \
+  --prefix="${BOSH_INSTALL_TARGET}" \
+  --enable-dso \
+  --enable-ctrls \
+  --enable-openssl \
+  --with-includes="${SQLITE_PKG}/include:${LIBMICROHTTPD_PKG}/include:${ZLIB_PKG}/include:${MARIADB_CC_PKG}/include:${MARIADB_CC_PKG}/include/mariadb" \
+  --with-libraries="${SQLITE_PKG}/lib:${LIBMICROHTTPD_PKG}/lib:${ZLIB_PKG}/lib:${MARIADB_CC_PKG}/lib/mariadb" \
+  --with-shared=mod_ctrls_admin:mod_prometheus:mod_tls:mod_sftp:mod_sql:mod_sql_mysql:mod_wrap2:mod_wrap2_file \
+  --with-mysql-config="${MARIADB_CONFIG}" \
+  --disable-nls \
+  --disable-curses
+
+make -j"$(nproc)"
+make install-strip || make install
+
+# Sanity
+"${BOSH_INSTALL_TARGET}/sbin/proftpd" -v || true
+"${BOSH_INSTALL_TARGET}/sbin/proftpd" -l || true
+if ! ls "${BOSH_INSTALL_TARGET}/libexec"/mod_prometheus.* >/dev/null 2>&1; then
+ echo "mod_prometheus not built"; exit 1
+fi

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source meta-info/blobs-versions.env # MARIADB_CC_VERSION
+
+# Available variables
+# $BOSH_COMPILE_TARGET - where this package & spec'd source files are available
+# $BOSH_INSTALL_TARGET - where you copy/install files to be included in package
+
+# export MARIADB_CC_VERSION="3.4.7"
+# export BOSH_INSTALL_TARGET="/home/molejnik/workspace/bosh/bosh-releases/temp/packages/mariadb-connector-c"
+
+tar xfv "mariadb/mariadb-connector-c-${MARIADB_CC_VERSION}-src.tar.gz"
+cd "mariadb-connector-c-${MARIADB_CC_VERSION}-src"
+
+cmake -DCMAKE_INSTALL_PREFIX="${BOSH_INSTALL_TARGET}" .
+make -j"$(nproc)"
+make install

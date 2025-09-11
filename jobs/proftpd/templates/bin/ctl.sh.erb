@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+JOB_DIR="/var/vcap/jobs/proftpd"
+RUN_DIR="/var/vcap/sys/run/proftpd"
+LOG_DIR="/var/vcap/sys/log/proftpd"
+PKG_DIR="/var/vcap/packages/proftpd"
+
+mkdir -p "$RUN_DIR" "$LOG_DIR"
+
+exec >>"$LOG_DIR/ctl.stdout.log" 2>>"$LOG_DIR/ctl.stderr.log"
+
+source "$PKG_DIR/bosh-utils/pid_utils.sh"
+source "$PKG_DIR/bosh-utils/script_utils.sh"
+SERVER_PIDFILE="${RUN_DIR}/proftpd.pid"
+
+function clean_proftpd_leftovers() {
+  local stage="${1:-unknown}"
+  # TERM matching proftpd processes
+  procs=$(pgrep -f '^proftpd: ' || true)
+  if [ -n "$procs" ]; then
+    log_info "[$stage] Found proftpd leftover processes (TERM): $procs"
+    if pkill -TERM -f '^proftpd: '; then
+      log_info "[$stage] Sent SIGTERM to leftover proftpd processes"
+    fi
+  fi
+  sleep 1
+
+  # KILL matching proftpd processes
+  procs=$(pgrep -f '^proftpd: ' || true)
+  if [ -n "$procs" ]; then
+    log_info "[$stage] Found proftpd leftover processes (KILL): $procs"
+    if pkill -KILL -f '^proftpd: '; then
+      log_info "[$stage] Sent SIGKILL to leftover proftpd processes"
+    fi
+  fi
+
+  # Report matching proftpd processes
+  procs=$(pgrep -f '^proftpd: ' || true)
+  if [ -n "$procs" ]; then
+    log_error "[$stage] Still found proftpd leftover processes: $procs"
+  fi
+}
+
+case "${1:-}" in
+  start)
+    log_info "[start] starting server..."
+    pid_guard "$SERVER_PIDFILE" proftpd
+    clean_proftpd_leftovers "start"
+    ALL_PKG_DIR="/var/vcap/packages"
+    export LD_LIBRARY_PATH="${ALL_PKG_DIR}/proftpd/lib:${ALL_PKG_DIR}/lib/mariadb:${ALL_PKG_DIR}/sqlite/lib:${ALL_PKG_DIR}/libmicrohttpd/lib:${ALL_PKG_DIR}/zlib/lib:${LD_LIBRARY_PATH:-}"
+    exec "${PKG_DIR}/sbin/proftpd" -c "${JOB_DIR}/config/proftpd.conf" >> "${LOG_DIR}/proftpd.stdout.log" 2>> "${LOG_DIR}/proftpd.stderr.log" &
+    log_info "[start] server started"
+  ;;
+
+  stop)
+
+<%- if_p("proftpd.mod_ctrls_admin.enabled") do |enabled| -%>
+  <%- if enabled -%>
+    log_info "[stop] Trying ftpdctl shutdown ..."
+    if "${PKG_DIR}/bin/ftpdctl" -s "${RUN_DIR}/proftpd.sock" shutdown; then
+      log_info "[stop] ftpdctl shutdown succeeded"
+    else
+      log_info "[stop] ftpdctl shutdown failed or not available"
+      log_info "[stop] Trying kill_and_wait ..."
+      if kill_and_wait "$SERVER_PIDFILE"; then
+        log_info "[stop] kill_and_wait succeeded"
+      else
+        log_warn "[stop] kill_and_wait failed (process may not have exited cleanly)"
+      fi
+    fi
+  <%- else -%>
+    log_info "[stop] Trying kill_and_wait ..."
+    if kill_and_wait "$SERVER_PIDFILE"; then
+      log_info "[stop] kill_and_wait succeeded"
+    else
+      log_warn "[stop] kill_and_wait failed (process may not have exited cleanly)"
+    fi
+  <%- end -%>
+<%- end -%>
+    clean_proftpd_leftovers "stop"
+  ;;
+
+  *)
+    echo "Usage: $0 {start|stop}"
+    exit 64
+  ;;
+esac

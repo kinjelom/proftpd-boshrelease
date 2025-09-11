@@ -1,0 +1,108 @@
+name: ((deployment_name))
+
+instance_groups:
+  - name: proftpd
+    azs: ((proftpd_azs))
+    instances: ((proftpd_instances))
+    vm_type: ((proftpd_vm_type))
+    stemcell: default
+    persistent_disk_type: ((proftpd_persistent_disk_type))
+    networks: [{name: default}]
+    jobs:
+      - name: proftpd
+        release: proftpd
+        tags:
+          prometheus_exporter_port: ((prometheus_exporter_port)) # 9273
+        properties:
+          proftpd:
+            server_name: ((deployment_name))
+            port: ((ftps_port))
+            umask: "117 007"
+            mod_prometheus:
+              enabled: true
+              logs_enabled: true
+              exporter_port: ((prometheus_exporter_port))
+            mod_tls:
+              enabled: true
+              logs_enabled: true
+              ca_crt: ((proftpd_tls.ca))
+              server_crt: ((proftpd_tls.certificate))
+              server_key: ((proftpd_tls.private_key))
+              raw_config:
+                closing:
+                  - TLSRequired on
+                  - TLSProtocol TLSv1.2 TLSv1.3
+                  - TLSVerifyClient off
+                  - TLSOptions EnableDiags
+            mod_sftp:
+              enabled: true
+              logs_enabled: true
+              port: ((sftp_port))
+              ssh_host_rsa_key: ((proftpd_sftp_host_rsa.private_key))
+              raw_config:
+                closing: []
+            local_auth:
+              enabled: true
+              users:
+                - name: test-user
+                  password: change-it
+                  # home: default /var/vcap/store/proftpd/data/homes/test-user
+                - name: test-user-ro
+                  password: change-it
+                  home: /var/vcap/store/proftpd/data/homes/test-user
+            raw_config:
+              closing:
+                - "<Limit LOGIN>"
+                - "  AllowUser test-user test-user-ro"
+                - "</Limit>"
+                - "<Directory /var/vcap/store/proftpd/data/homes/test-user>"
+                - "  # Full access user"
+                - "  <Limit ALL>"
+                - "    AllowUser test-user"
+                - "    DenyAll"
+                - "  </Limit>"
+                - "  # Read-only user"
+                - "  <Limit READ DIRS>"
+                - "    AllowUser test-user-ro"
+                - "  </Limit>"
+                - "  <Limit WRITE>"
+                - "    DenyUser test-user-ro"
+                - "  </Limit>"
+                - "</Directory>"
+
+
+variables:
+
+  - name: proftpd_ca
+    type: certificate
+    options:
+      is_ca: true
+      common_name: ((deployment_name))
+  - name: proftpd_tls
+    type: certificate
+    options:
+      ca: proftpd_ca
+      common_name: ((proftpd_tls_common_name))
+      alternative_names:
+        - "*.proftpd.default.((deployment_name)).bosh"
+      extended_key_usage: [server_auth]
+
+  - name: proftpd_sftp_host_rsa
+    type: rsa
+
+stemcells:
+  - alias: default
+    os: ubuntu-jammy
+    version: latest
+
+releases:
+  - name: proftpd
+    version: latest
+
+update:
+  canaries: 0
+  max_in_flight: 1
+  serial: true
+  canary_watch_time: 1000-20000
+  update_watch_time: 1000-20000
+

@@ -1,0 +1,251 @@
+<%
+  job_dir="/var/vcap/jobs/proftpd"
+  pkg_dir="/var/vcap/packages/proftpd"
+  run_dir="/var/vcap/sys/run/proftpd"
+  log_dir="/var/vcap/sys/log/proftpd"
+  data_dir="/var/vcap/data/proftpd"
+  def p_truthy(path)
+    val = begin
+            p(path) rescue false
+          end
+    val === true || val.to_s.downcase == "true"
+  end
+
+  def arr(v)
+    v.is_a?(Array) ? v : Array(v).compact
+  end
+-%>
+<%# @formatter:off -%>
+<%- if p_truthy("proftpd.logs.trace.enabled") -%>
+  <%- if_p("proftpd.logs.trace.verbosity") do |verbosity| -%>
+# --- Trace logging ---
+TraceLog <%= log_dir %>/proftpd-trace.log
+Trace <%= verbosity %>
+  <%- end -%>
+<%- end -%>
+# --- Server config prologue ---
+<%- p('proftpd.server.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+
+# --- Base server settings ---
+ServerType         standalone
+DefaultServer      off
+ServerName         <%= p('proftpd.server.name') %>
+Port               <%= p('proftpd.server.port') %>
+DefaultAddress     <%= p_truthy("proftpd.listen_on_instance_ip") ? spec.ip : "0.0.0.0" %>
+<%- if_p("proftpd.server.masquerade_address") do |masquerade_address| -%>
+MasqueradeAddress  <%= masquerade_address %>
+<%- end -%>
+<%- if_p("proftpd.server.passive_ports") do |passive_ports| -%>
+# Passive mode (recommended for clients behind firewalls/NAT)
+PassivePorts       <%= passive_ports %>
+<%- end -%>
+UseIPv6            <%= p('proftpd.server.use_ip_v6') %>
+PidFile            <%= run_dir %>/proftpd.pid
+ScoreboardFile     <%= run_dir %>/proftpd.scoreboard
+ModulePath         <%= pkg_dir %>/libexec
+UseReverseDNS      off
+# --- Server config closing ---
+<%- p('proftpd.server.raw_config.closing', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+
+
+# --- Global config ---
+<Global>
+  # --- Global logs config ---
+  ServerLog <%= p_truthy("proftpd.logs.server.enabled") ? log_dir+"/proftpd-server.log" : "none" %>
+  TransferLog <%= p_truthy("proftpd.logs.transfer.enabled") ? log_dir+"/proftpd-transfer.log" : "none" %>
+  <%- if p_truthy("proftpd.logs.extended.enabled") -%>
+    <%- if_p("proftpd.logs.extended.format") do |fmt| -%>
+  LogFormat extended_log_fmt '<%= fmt %>'
+  ExtendedLog <%= log_dir %>/proftpd-extended.log ALL extended_log_fmt
+    <%- end -%>
+  <%- end -%>
+  # --- Global common config ---
+  DefaultRoot <%= p('proftpd.global.default_root') %>
+  DefaultChdir <%= p('proftpd.global.default_chdir') %>
+  DefaultTransferMode <%= p('proftpd.global.default_transfer_mode') %>
+  Umask <%= p('proftpd.global.umask') %>
+  User <%= p('proftpd.global.user') %>
+  Group <%= p('proftpd.global.group') %>
+  AuthOrder <%= p('proftpd.global.auth_order') %>
+  RequireValidShell <%= p('proftpd.global.require_valid_shell') %>
+  AllowOverwrite <%= p('proftpd.global.allow_overwrite') %>
+  TimesGMT <%= p('proftpd.global.times_gmt') %>
+  CreateHome <%= p('proftpd.global.create_home') %>
+  MaxClientsPerUser <%= p('proftpd.global.max_clients_per_user') %>
+  TimeoutIdle <%= p('proftpd.global.timeout_idle') %>
+  TimeoutLinger <%= p('proftpd.global.timeout_linger') %>
+  TimeoutLogin <%= p('proftpd.global.timeout_login') %>
+  TimeoutNoTransfer <%= p('proftpd.global.timeout_no_transfer') %>
+  TimeoutSession <%= p('proftpd.global.timeout_session') %>
+  TimeoutStalled <%= p('proftpd.global.timeout_stalled') %>
+  # --- Global closing config ---
+  <%- p('proftpd.global.raw_config.closing', []).each do |line| -%>
+  <%= line %>
+  <%- end -%>
+</Global>
+
+# --- Modules ---
+
+<%- if p_truthy("proftpd.mod_auth_file.enabled") -%>
+<%= p_truthy("proftpd.mod_auth_file.global") ? "<Global>" : "" %>
+# mod_auth_file
+<%- p('proftpd.mod_auth_file.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<IfModule mod_auth_file.c>
+  <%- if_p("proftpd.mod_auth_file.options") do |opt| -%>
+  AuthFileOptions "<%= opt %>"
+  <%- end -%>
+  AuthUserFile <%= job_dir %>/config/auth.users
+  AuthGroupFile <%= job_dir %>/config/auth.groups
+  <%- p('proftpd.mod_auth_file.raw_config.closing', []).each do |line| -%>
+  <%= line %>
+  <%- end -%>
+</IfModule>
+<%- p('proftpd.mod_auth_file.raw_config.epilogue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<%= p_truthy("proftpd.mod_auth_file.global") ? "</Global>" : "" %>
+<%- end -%>
+
+<%- if p_truthy("proftpd.mod_sql.enabled") -%>
+<%= p_truthy("proftpd.mod_sql.global") ? "<Global>" : "" %>
+# MySQL auth via mod_sql + mod_sql_mysql
+<%- p('proftpd.mod_sql.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<IfModule mod_sql.c>
+  SQLEngine on
+  SQLLogFile <%= p_truthy("proftpd.mod_sql.logs_enabled") ? log_dir+"/mod_sql.log" : "none" %>
+  <%- p('proftpd.mod_sql.raw_config.closing', []).each do |line| -%>
+  <%= line %>
+  <%- end -%>
+</IfModule>
+<%- p('proftpd.mod_sql.raw_config.epilogue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<%= p_truthy("proftpd.mod_sql.global") ? "</Global>" : "" %>
+<%- end -%>
+
+<%- if p_truthy("proftpd.mod_wrap2.enabled") -%>
+<%= p_truthy("proftpd.mod_wrap2.global") ? "<Global>" : "" %>
+# Wrap2 (allow/deny rules without tcp_wrappers)
+<%- p('proftpd.mod_wrap2.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<IfModule mod_wrap2.c>
+  WrapEngine on
+  WrapLog <%= p_truthy("proftpd.mod_wrap2.logs_enabled") ? log_dir+"/mod_wrap2.log" : "none" %>
+  WrapTables file:<%= job_dir %>/config/mod_wrap2/write_tables
+  <%- p('proftpd.mod_wrap2.raw_config.closing', []).each do |line| -%>
+  <%= line %>
+  <%- end -%>
+</IfModule>
+<%- p('proftpd.mod_wrap2.raw_config.epilogue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<%= p_truthy("proftpd.mod_wrap2.global") ? "</Global>" : "" %>
+<%- end -%>
+
+
+<%- if p_truthy("proftpd.mod_tls.enabled") -%>
+# FTPS (explicit) on control port <%= p('proftpd.server.port') %>
+<% p('proftpd.mod_tls.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<IfModule mod_tls.c>
+  TLSEngine on
+  TLSLog <%= p_truthy("proftpd.mod_tls.logs_enabled") ? log_dir+"/mod_tls.log" : "none" %> # used with 'TLSOptions EnableDiags'
+  TLSCACertificateFile <%= job_dir %>/config/mod_tls/ca.crt
+  TLSRSACertificateFile <%= job_dir %>/config/mod_tls/server.crt
+  TLSRSACertificateKeyFile <%= job_dir %>/config/mod_tls/server.key
+  <%- p('proftpd.mod_tls.raw_config.closing', []).each do |line| -%>
+  <%= line %>
+  <%- end -%>
+</IfModule>
+<%- p('proftpd.mod_tls.raw_config.epilogue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<%- end -%>
+
+<%- if p_truthy("proftpd.mod_sftp.enabled") -%>
+# SFTP in a separate VirtualHost (different port)
+# SFTP (uses OpenSSL internally)
+<%- p('proftpd.mod_sftp.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<VirtualHost <%= p_truthy("proftpd.mod_sftp.listen_on_instance_ip") ? spec.ip : "0.0.0.0" %>>
+  Port <%= p('proftpd.mod_sftp.port') %>
+  <%- if_p("proftpd.mod_sftp.masquerade_address") do |masquerade_address| -%>
+  MasqueradeAddress <%= masquerade_address %>
+  <%- end -%>
+  # VERY IMPORTANT: keep TLS OFF here
+  <IfModule mod_tls.c>
+    TLSEngine off
+  </IfModule>
+  <IfModule mod_sftp.c>
+    SFTPEngine on
+    SFTPLog <%= p_truthy("proftpd.mod_sftp.logs_enabled") ? log_dir+"/mod_sftp.log" : "none" %>
+    SFTPHostKey <%= job_dir %>/config/mod_sftp/ssh_host_rsa_key
+    <%- p('proftpd.mod_sftp.raw_config.closing', []).each do |line| -%>
+    <%= line %>
+    <%- end -%>
+  </IfModule>
+  <%- p('proftpd.mod_sftp.raw_config.epilogue', []).each do |line| -%>
+  <%= line %>
+  <%- end -%>
+</VirtualHost>
+<%- end -%>
+
+<%- if p_truthy("proftpd.mod_ctrls_admin.enabled") -%>
+# Controls (for graceful shutdown via ftpdctl)
+<%- p('proftpd.mod_ctrls_admin.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<IfModule mod_ctrls_admin.c>
+  ControlsEngine on
+  ControlsSocket <%= run_dir %>/proftpd.sock
+  <% if p_truthy("proftpd.mod_ctrls_admin.logs_enabled") -%>
+  ControlsLog <%= log_dir+"/mod_ctrls_admin.log" %>
+  <%- end -%>
+  <%- p('proftpd.mod_ctrls_admin.raw_config.closing', []).each do |line| -%>
+  <%= line %>
+  <%- end -%>
+</IfModule>
+<%- p('proftpd.mod_ctrls_admin.raw_config.epilogue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<%- end -%>
+
+<%- if p_truthy("proftpd.mod_prometheus.enabled") -%>
+# Prometheus metrics exporter
+<%- p('proftpd.mod_prometheus.raw_config.prologue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<IfModule mod_prometheus.c>
+  PrometheusEngine on
+  <% if p_truthy("proftpd.mod_prometheus.logs_enabled") -%>
+  PrometheusLog <%= log_dir+"/mod_prometheus.log" %>
+  <%- end -%>
+  PrometheusPidFile <%= run_dir %>/mod_prometheus.pid
+  PrometheusExporter <%= p_truthy("proftpd.mod_prometheus.listen_on_instance_ip") ? spec.ip : "0.0.0.0" %>:<%= p('proftpd.mod_prometheus.exporter_port') %>
+  PrometheusTables <%= data_dir %>/mod_prometheus
+  <%- p('proftpd.mod_prometheus.raw_config.closing', []).each do |line| -%>
+  <%= line %>
+  <%- end -%>
+</IfModule>
+<%- p('proftpd.mod_prometheus.raw_config.epilogue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<%- end -%>
+
+
+# --- Server config epilogue ---
+<%- p('proftpd.server.raw_config.epilogue', []).each do |line| -%>
+<%= line %>
+<%- end -%>
+<%# @formatter:on -%>

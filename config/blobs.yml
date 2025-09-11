@@ -1,0 +1,24 @@
+devs/libmicrohttpd-1.0.2.tar.gz:
+  size: 2198804
+  object_id: b58e0ad1-d830-4831-5965-352daf929768
+  sha: sha256:df324fcd0834175dab07483133902d9774a605bfa298025f69883288fd20a8c7
+devs/sqlite-autoconf-3500400.tar.gz:
+  size: 3173050
+  object_id: b0ecf141-9ea4-4fac-6fa4-7ba53d6724d5
+  sha: sha256:a3db587a1b92ee5ddac2f66b3edb41b26f9c867275782d46c3a088977d6a5b18
+devs/zlib-1.3.1.tar.gz:
+  size: 1512791
+  object_id: 50a2d5e5-5980-426e-7954-2fa1e926e35b
+  sha: sha256:9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23
+mariadb/mariadb-connector-c-3.4.7-src.tar.gz:
+  size: 1378870
+  object_id: 76dbc08a-6d0c-4647-5a94-c1f6e823c8ae
+  sha: sha256:33bb61168380af706b9e9531396cca223179ac2f9fe72edeae69e4546d7b7a2b
+proftpd/mod_prometheus-0.2.7.src.zip:
+  size: 167173
+  object_id: a1dbb977-8eb7-41f6-4ab2-047eb61ad3da
+  sha: sha256:1ae02eede8377b9e0faba7f11eeccc1f04b3caa87f7d182e2a4331dabfb01107
+proftpd/proftpd-1.3.9.tar.gz:
+  size: 19837398
+  object_id: b02d781b-c214-4912-4b05-067382dd51d2
+  sha: sha256:4a5f13b666226813b4da0ade34535d325e204ab16cf8008c7353b1b5a972f74b

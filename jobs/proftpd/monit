@@ -1,0 +1,5 @@
+check process proftpd
+  with pidfile /var/vcap/sys/run/proftpd/proftpd.pid
+  start program "/var/vcap/jobs/proftpd/bin/ctl.sh start"
+  stop program  "/var/vcap/jobs/proftpd/bin/ctl.sh stop"
+  group vcap

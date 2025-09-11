@@ -1,0 +1,20 @@
+<%-
+  users = p("proftpd.mod_auth_file.users", []) || []
+  homes_dir = p("proftpd.storage.homes_base_dir")
+  default_uid  = 1000  # vcap
+  default_gid  = 1000  # vcap
+-%>
+<%# @formatter:off -%>
+<%- users.each do |u| -%>
+  <%-
+    name = u.fetch("name")
+    pass = u.fetch("password_hash")
+    uid  = (u["uid"] || default_uid).to_i
+    gid  = (u["gid"] || default_gid).to_i
+    gecos = u["gecos"] || "no-comment"
+    home = u["home"] || homes_dir+"/"+name
+    shell = u["shell"] || "/bin/false"
+  -%>
+<%= name %>:<%= pass %>:<%= uid %>:<%= gid %>:<%= gecos %>:<%= home %>:<%= shell %>
+<%- end -%>
+<%# @formatter:on -%>
