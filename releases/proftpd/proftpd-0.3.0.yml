@@ -1,0 +1,83 @@
+name: proftpd
+version: 0.3.0
+commit_hash: 31a06ef
+uncommitted_changes: false
+jobs:
+- name: fsaa
+  version: 4e10e922952c9a1072bebe4211617f1b0fc2722dad9e3026ec88966b1e37e7b4
+  fingerprint: 4e10e922952c9a1072bebe4211617f1b0fc2722dad9e3026ec88966b1e37e7b4
+  sha1: sha256:76aed6d62dc18ea9f730a0c80aa46d295418266b0af6d95e2b2fc156a7977f12
+  packages:
+  - fsaa
+- name: proftpd
+  version: eadac6bff6c6f0b2dd3f9d9f30a3a4cd72dd1454a4aef244ed3a92d776a6b8ac
+  fingerprint: eadac6bff6c6f0b2dd3f9d9f30a3a4cd72dd1454a4aef244ed3a92d776a6b8ac
+  sha1: sha256:cf2570773f8833d3526003a80bd051fd969664ac855557f4b80445962b3b12f1
+  packages:
+  - curl
+  - libmicrohttpd
+  - mariadb-connector-c
+  - nghttp2
+  - openssl
+  - proftpd
+  - sqlite
+  - zlib
+packages:
+- name: curl
+  version: 07568943579f778dd1be18d6a9c37eb79f93b5397ac69f845b9d495607108762
+  fingerprint: 07568943579f778dd1be18d6a9c37eb79f93b5397ac69f845b9d495607108762
+  sha1: sha256:e1fbe3373198bd82b12d65c4caebd3ced40f9f19af28fddac3b4fbef73eefc39
+  dependencies:
+  - openssl
+  - nghttp2
+- name: fsaa
+  version: f4bc846dd4b68c82aaec7fa6d7df54ca033e992e2e8663bfe1f8e812f3959009
+  fingerprint: f4bc846dd4b68c82aaec7fa6d7df54ca033e992e2e8663bfe1f8e812f3959009
+  sha1: sha256:d0ce7048e629241e4bd1a2d25a7c6a2654dc8ec46df9a8bd44cd302a813c17cb
+  dependencies: []
+- name: libmicrohttpd
+  version: b7f06af690f8ba54b382f018249322631bddc24a5729b3d586d310e6e419a5e7
+  fingerprint: b7f06af690f8ba54b382f018249322631bddc24a5729b3d586d310e6e419a5e7
+  sha1: sha256:1690fff948d7e679843cb2f2a76769fd567a3e4e629f07abcb4eef88dbe0ce05
+  dependencies: []
+- name: mariadb-connector-c
+  version: b36bec0d9e08ece2473b5758bef28b44219e11c7152e3cdf8881cec6837d1911
+  fingerprint: b36bec0d9e08ece2473b5758bef28b44219e11c7152e3cdf8881cec6837d1911
+  sha1: sha256:faaed5b68ac760bee1fd8801fdadd7ef0cf776beabfa27568788f6ec2d2ccf34
+  dependencies: []
+- name: nghttp2
+  version: ddd011937c7d3303134d9f07ca9b1b54f40f8d1ef5bbb9a38fe4f84986697aa4
+  fingerprint: ddd011937c7d3303134d9f07ca9b1b54f40f8d1ef5bbb9a38fe4f84986697aa4
+  sha1: sha256:a81878609aad573c5e4fd3ca81d90ae3e8baf4758a7e075f7761088065a3404d
+  dependencies: []
+- name: openssl
+  version: be2093e77b8e2c0057b5d21ac7bd3367a4757b3292bb4c20656f8220f1e2de47
+  fingerprint: be2093e77b8e2c0057b5d21ac7bd3367a4757b3292bb4c20656f8220f1e2de47
+  sha1: sha256:b88f4af2003e6b49bc7111b8cc9dfc26c9afe9938f0ccedde108edf09ba1bb8d
+  dependencies: []
+- name: proftpd
+  version: 2f29860e7381d8d8171337e111b81ea720ad7906d53ee9aa58c9878dc38c3aa0
+  fingerprint: 2f29860e7381d8d8171337e111b81ea720ad7906d53ee9aa58c9878dc38c3aa0
+  sha1: sha256:9cfa9f0042b95f6ed2a9cb8f1685c33c6eeaea493cf291be1e661ade93a844d4
+  dependencies:
+  - libmicrohttpd
+  - sqlite
+  - zlib
+  - curl
+  - openssl
+  - nghttp2
+  - mariadb-connector-c
+- name: sqlite
+  version: 2ffaf064ea54bfe9381053000e9ff51fa956c024d399268455bccedcfa91beff
+  fingerprint: 2ffaf064ea54bfe9381053000e9ff51fa956c024d399268455bccedcfa91beff
+  sha1: sha256:d4d493837763018a329ccf06fadd48ac3e8f41f8e0b75eb15ba4926641e2d68f
+  dependencies: []
+- name: zlib
+  version: b53f281772e70ce105c2aab37aa7424f2d46024f079beef1ec4af8b92d5b9d68
+  fingerprint: b53f281772e70ce105c2aab37aa7424f2d46024f079beef1ec4af8b92d5b9d68
+  sha1: sha256:ee34a99b9407cc10dfe1d506baa1a31a4ea825adbd382a203bfbd192922add8a
+  dependencies: []
+license:
+  version: 06fe45897b08088c04a79479908ee81b9482e725ede52981486061d486f8f32e
+  fingerprint: 06fe45897b08088c04a79479908ee81b9482e725ede52981486061d486f8f32e
+  sha1: sha256:1791b2fb15ddde90c9389590135a381b1c209eae36107af9bd1c2bd34bef57bb
